@@ -20,8 +20,13 @@ able to open `/dev/dri/renderD128`; normal Arch installations grant this through
 the active desktop session.
 
 USB requires the device to be paired with the machine. Start `usbmuxd.service`
-if socket activation does not do so automatically. Wi-Fi discovery requires
-`avahi-daemon.service`.
+if socket activation does not do so automatically. Wi-Fi discovery requires a
+running Avahi daemon; installing the package does not enable system services:
+
+```sh
+sudo systemctl enable --now avahi-daemon.service
+systemctl status avahi-daemon.service
+```
 
 ## Build and test
 
@@ -62,6 +67,14 @@ control. Other useful forms are:
 ./build/linux/opendisplay-linux --transport wifi --host 192.168.1.40
 ./build/linux/opendisplay-linux --encoder vaapi --vaapi-device /dev/dri/renderD128
 ./build/linux/opendisplay-linux --encoder nvenc --mode mirror --no-input
+```
+
+If Bonjour discovery is unavailable, confirm that the phone app is open and
+inspect the advertised service with `avahi-browse -rt _opensidecar._tcp`.
+You can bypass Avahi when the receiver's address is known:
+
+```sh
+opendisplay-linux --transport wifi --host 192.168.1.40 --port 9000
 ```
 
 `--encoder auto` prefers VA-API, then NVENC, and falls back to `libx264`.

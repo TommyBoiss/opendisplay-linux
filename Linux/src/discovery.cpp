@@ -21,7 +21,23 @@ struct AvahiContext {
     AvahiClient* client = nullptr;
     AvahiServiceBrowser* browser = nullptr;
     std::vector<Endpoint> endpoints;
+    std::string failure;
+    bool daemonReady = false;
 };
+
+std::string avahiFailure(const std::string_view operation, const int error) {
+    std::string message(operation);
+    message += ": ";
+    message += avahi_strerror(error);
+    if (error == AVAHI_ERR_NO_DAEMON || error == AVAHI_ERR_DISCONNECTED
+        || error == AVAHI_ERR_BAD_STATE) {
+        message += ". Start Avahi with `sudo systemctl enable --now avahi-daemon.service`";
+    } else if (error == AVAHI_ERR_ACCESS_DENIED) {
+        message += ". Check the system D-Bus and Avahi access policy";
+    }
+    message += "; use `--host <device-ip>` to bypass discovery";
+    return message;
+}
 
 void resolveCallback(AvahiServiceResolver* resolver, AvahiIfIndex, AvahiProtocol,
                      AvahiResolverEvent event, const char* name, const char*,
@@ -45,25 +61,49 @@ void resolveCallback(AvahiServiceResolver* resolver, AvahiIfIndex, AvahiProtocol
                 .usbHandle = -1,
             });
         }
+    } else if (event == AVAHI_RESOLVER_FAILURE) {
+        auto* client = avahi_service_resolver_get_client(resolver);
+        debug(avahiFailure("Avahi could not resolve a receiver", avahi_client_errno(client)));
     }
     avahi_service_resolver_free(resolver);
 }
 
-void browseCallback(AvahiServiceBrowser*, AvahiIfIndex interface, AvahiProtocol protocol,
+void browseCallback(AvahiServiceBrowser* browser, AvahiIfIndex interface, AvahiProtocol protocol,
                     AvahiBrowserEvent event, const char* name, const char* type,
                     const char* domain, AvahiLookupResultFlags, void* userdata) {
     auto& context = *static_cast<AvahiContext*>(userdata);
+    auto* client = avahi_service_browser_get_client(browser);
     if (event == AVAHI_BROWSER_NEW) {
-        avahi_service_resolver_new(context.client, interface, protocol, name, type, domain,
-                                   AVAHI_PROTO_UNSPEC, AVAHI_LOOKUP_USE_MULTICAST,
-                                   resolveCallback, &context);
+        if (avahi_service_resolver_new(client, interface, protocol, name, type, domain,
+                                       AVAHI_PROTO_UNSPEC, AVAHI_LOOKUP_USE_MULTICAST,
+                                       resolveCallback, &context) == nullptr) {
+            debug(avahiFailure("Avahi could not create a resolver",
+                               avahi_client_errno(client)));
+        }
+    } else if (event == AVAHI_BROWSER_FAILURE) {
+        context.failure = avahiFailure("Avahi browsing failed", avahi_client_errno(client));
+        avahi_simple_poll_quit(context.poll);
     }
 }
 
 void clientCallback(AvahiClient* client, const AvahiClientState state, void* userdata) {
     auto& context = *static_cast<AvahiContext*>(userdata);
-    if (state == AVAHI_CLIENT_FAILURE) {
-        debug(std::string("Avahi failure: ") + avahi_strerror(avahi_client_errno(client)));
+    if (state == AVAHI_CLIENT_S_RUNNING) {
+        context.daemonReady = true;
+        if (context.browser == nullptr) {
+            // avahi_client_new() invokes this callback before it returns, so
+            // use the callback argument rather than context.client here.
+            context.browser = avahi_service_browser_new(
+                client, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, "_opensidecar._tcp", nullptr,
+                AVAHI_LOOKUP_USE_MULTICAST, browseCallback, &context);
+            if (context.browser == nullptr) {
+                context.failure = avahiFailure("Avahi could not browse _opensidecar._tcp",
+                                               avahi_client_errno(client));
+                avahi_simple_poll_quit(context.poll);
+            }
+        }
+    } else if (state == AVAHI_CLIENT_FAILURE) {
+        context.failure = avahiFailure("Avahi client failed", avahi_client_errno(client));
         avahi_simple_poll_quit(context.poll);
     }
 }
@@ -81,24 +121,29 @@ std::vector<Endpoint> discoverWifi(const std::chrono::milliseconds timeout) {
                                       clientCallback, &context, &error);
     if (context.client == nullptr) {
         avahi_simple_poll_free(context.poll);
-        throw std::runtime_error(std::string("cannot connect to Avahi: ") + avahi_strerror(error));
-    }
-    context.browser = avahi_service_browser_new(
-        context.client, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, "_opensidecar._tcp", nullptr,
-        AVAHI_LOOKUP_USE_MULTICAST, browseCallback, &context);
-    if (context.browser == nullptr) {
-        avahi_client_free(context.client);
-        avahi_simple_poll_free(context.poll);
-        throw std::runtime_error("cannot browse for _opensidecar._tcp");
+        throw std::runtime_error(avahiFailure("Cannot connect to Avahi", error));
     }
 
     const auto deadline = std::chrono::steady_clock::now() + timeout;
-    while (std::chrono::steady_clock::now() < deadline) {
-        avahi_simple_poll_iterate(context.poll, 100);
+    while (context.failure.empty() && std::chrono::steady_clock::now() < deadline) {
+        if (avahi_simple_poll_iterate(context.poll, 100) < 0) {
+            context.failure = "Avahi event loop failed; use `--host <device-ip>` to bypass discovery";
+        }
     }
-    avahi_service_browser_free(context.browser);
+    if (!context.daemonReady && context.failure.empty()) {
+        context.failure =
+            "Avahi daemon did not become ready. Start it with "
+            "`sudo systemctl enable --now avahi-daemon.service`; use "
+            "`--host <device-ip>` to bypass discovery";
+    }
+    if (context.browser != nullptr) {
+        avahi_service_browser_free(context.browser);
+    }
     avahi_client_free(context.client);
     avahi_simple_poll_free(context.poll);
+    if (!context.failure.empty()) {
+        throw std::runtime_error(context.failure);
+    }
     return context.endpoints;
 }
 

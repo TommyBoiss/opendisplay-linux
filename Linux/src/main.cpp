@@ -131,14 +131,14 @@ int main(int argc, char* argv[]) {
             try {
                 for (const auto& endpoint : od::discoverUsb()) printEndpoint(endpoint);
             } catch (const std::exception& error) {
-                od::debug(error.what());
+                od::log(error.what());
             }
             try {
                 for (const auto& endpoint : od::discoverWifi(std::chrono::seconds(3))) {
                     printEndpoint(endpoint);
                 }
             } catch (const std::exception& error) {
-                od::debug(error.what());
+                od::log(error.what());
             }
             return 0;
         }
