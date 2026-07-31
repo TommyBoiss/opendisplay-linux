@@ -112,7 +112,13 @@ display ([#72](https://github.com/peetzweg/opendisplay/issues/72)).
 
 ## Quick start (from source)
 
-### Prerequisites
+### Linux CLI MVP (KDE Wayland)
+
+An experimental Linux sender is available under [`Linux/`](Linux/README.md).
+It uses the existing iOS app unchanged and supports Wi-Fi, usbmuxd USB,
+PipeWire capture, portal-based virtual outputs/input, and FFmpeg H.264 encoding.
+
+### macOS and iOS prerequisites
 
 ```sh
 brew install xcodegen   # project generation

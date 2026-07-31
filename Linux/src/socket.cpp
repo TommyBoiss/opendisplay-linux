@@ -1,0 +1,121 @@
+#include "opendisplay/socket.hpp"
+
+#include <usbmuxd.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstring>
+#include <stdexcept>
+
+namespace od {
+
+Socket::Socket(const int fd) : fd_(fd) {}
+
+Socket::~Socket() { close(); }
+
+Socket::Socket(Socket&& other) noexcept : fd_(other.release()) {}
+
+Socket& Socket::operator=(Socket&& other) noexcept {
+    if (this != &other) {
+        close();
+        fd_ = other.release();
+    }
+    return *this;
+}
+
+int Socket::release() {
+    const int result = fd_;
+    fd_ = -1;
+    return result;
+}
+
+void Socket::close() {
+    if (fd_ >= 0) {
+        ::shutdown(fd_, SHUT_RDWR);
+        ::close(fd_);
+        fd_ = -1;
+    }
+}
+
+bool Socket::readExact(const std::span<char> destination) {
+    std::size_t offset = 0;
+    while (offset < destination.size()) {
+        const auto count = ::recv(fd_, destination.data() + offset, destination.size() - offset, 0);
+        if (count == 0) {
+            return false;
+        }
+        if (count < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
+        }
+        offset += static_cast<std::size_t>(count);
+    }
+    return true;
+}
+
+bool Socket::writeAll(const std::string_view bytes) {
+    std::size_t offset = 0;
+    while (offset < bytes.size()) {
+        const auto count = ::send(fd_, bytes.data() + offset, bytes.size() - offset, MSG_NOSIGNAL);
+        if (count < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
+        }
+        if (count == 0) {
+            return false;
+        }
+        offset += static_cast<std::size_t>(count);
+    }
+    return true;
+}
+
+Socket connectTcp(const std::string& host, const std::uint16_t port) {
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    addrinfo* addresses = nullptr;
+    const auto service = std::to_string(port);
+    const int result = getaddrinfo(host.c_str(), service.c_str(), &hints, &addresses);
+    if (result != 0) {
+        throw std::runtime_error("cannot resolve " + host + ": " + gai_strerror(result));
+    }
+
+    Socket connected;
+    for (auto* address = addresses; address != nullptr; address = address->ai_next) {
+        Socket candidate(::socket(address->ai_family, address->ai_socktype, address->ai_protocol));
+        if (!candidate.valid()) {
+            continue;
+        }
+        const int enabled = 1;
+        setsockopt(candidate.fd(), IPPROTO_TCP, TCP_NODELAY, &enabled, sizeof(enabled));
+        if (::connect(candidate.fd(), address->ai_addr, address->ai_addrlen) == 0) {
+            connected = std::move(candidate);
+            break;
+        }
+    }
+    freeaddrinfo(addresses);
+    if (!connected.valid()) {
+        throw std::runtime_error("cannot connect to " + host + ":" + service);
+    }
+    return connected;
+}
+
+Socket connectUsb(const int deviceHandle, const std::uint16_t port) {
+    const int fd = usbmuxd_connect(static_cast<std::uint32_t>(deviceHandle), port);
+    if (fd < 0) {
+        throw std::runtime_error("usbmuxd could not connect to device port " + std::to_string(port));
+    }
+    return Socket(fd);
+}
+
+}  // namespace od
