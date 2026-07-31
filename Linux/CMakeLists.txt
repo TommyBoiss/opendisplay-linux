@@ -72,6 +72,16 @@ if(BUILD_TESTING)
     target_link_libraries(opendisplay-pipewire-format-tests PRIVATE PkgConfig::PIPEWIRE)
     target_compile_options(opendisplay-pipewire-format-tests PRIVATE -UNDEBUG)
     add_test(NAME pipewire-format COMMAND opendisplay-pipewire-format-tests)
+
+    add_executable(opendisplay-socket-tests
+        tests/socket_tests.cpp
+        src/socket.cpp
+    )
+    target_include_directories(opendisplay-socket-tests PRIVATE include)
+    target_link_libraries(opendisplay-socket-tests PRIVATE PkgConfig::USBMUXD Threads::Threads)
+    target_compile_options(opendisplay-socket-tests PRIVATE -UNDEBUG)
+    add_test(NAME socket COMMAND opendisplay-socket-tests)
+    set_tests_properties(socket PROPERTIES TIMEOUT 5)
 endif()
 
 install(TARGETS opendisplay-linux RUNTIME DESTINATION bin)

@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -15,6 +16,26 @@
 #include <thread>
 
 namespace od {
+namespace {
+
+bool waitForSocket(const int fd, const short events) {
+    pollfd descriptor{.fd = fd, .events = events, .revents = 0};
+    for (;;) {
+        const int result = ::poll(&descriptor, 1, -1);
+        if (result < 0 && errno == EINTR) {
+            continue;
+        }
+        if (result <= 0) {
+            return false;
+        }
+        if ((descriptor.revents & events) != 0) {
+            return true;
+        }
+        return false;
+    }
+}
+
+}  // namespace
 
 Socket::Socket(const int fd) : fd_(fd) {}
 
@@ -55,6 +76,11 @@ bool Socket::readExact(const std::span<char> destination) {
             if (errno == EINTR) {
                 continue;
             }
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if (waitForSocket(fd_, POLLIN)) {
+                    continue;
+                }
+            }
             return false;
         }
         offset += static_cast<std::size_t>(count);
@@ -69,6 +95,11 @@ bool Socket::writeAll(const std::string_view bytes) {
         if (count < 0) {
             if (errno == EINTR) {
                 continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if (waitForSocket(fd_, POLLOUT)) {
+                    continue;
+                }
             }
             return false;
         }
