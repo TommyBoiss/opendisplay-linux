@@ -358,6 +358,12 @@ void FfmpegEncoder::consumeNal(std::string nal, std::string& accessUnit, bool& h
         return;
     }
     const int type = static_cast<unsigned char>(nal[prefix]) & 0x1f;
+    // FFmpeg's Annex-B muxer may mix three- and four-byte delimiters. The
+    // existing iOS receiver intentionally recognizes only the four-byte form,
+    // matching the macOS sender, so normalize every NAL before transmission.
+    if (prefix == 3) {
+        nal.insert(nal.begin(), '\0');
+    }
     if (type == 9 && hasVcl) {
         emitAccessUnit(std::move(accessUnit));
         accessUnit.clear();

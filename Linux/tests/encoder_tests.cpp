@@ -5,8 +5,34 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <string_view>
 #include <thread>
 #include <vector>
+
+namespace {
+
+bool hasOnlyFourByteStartCodes(const std::string_view bytes) {
+    for (std::size_t index = 0; index + 2 < bytes.size(); ++index) {
+        if (bytes[index] == 0 && bytes[index + 1] == 0 && bytes[index + 2] == 1
+            && (index == 0 || bytes[index - 1] != 0)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool hasNalType(const std::string_view bytes, const unsigned char type) {
+    for (std::size_t index = 0; index + 4 < bytes.size(); ++index) {
+        if (bytes[index] == 0 && bytes[index + 1] == 0 && bytes[index + 2] == 0
+            && bytes[index + 3] == 1
+            && (static_cast<unsigned char>(bytes[index + 4]) & 0x1fU) == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace
 
 int main() {
     std::mutex mutex;
@@ -45,5 +71,11 @@ int main() {
     assert(!output.empty());
     assert(od::wire::containsAnnexBStartCode(output.front().annexB));
     assert(output.front().keyframe);
+    assert(hasNalType(output.front().annexB, 7));  // SPS
+    assert(hasNalType(output.front().annexB, 8));  // PPS
+    assert(hasNalType(output.front().annexB, 5));  // IDR slice
+    for (const auto& encoded : output) {
+        assert(hasOnlyFourByteStartCodes(encoded.annexB));
+    }
     return 0;
 }
