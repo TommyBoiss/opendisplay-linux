@@ -129,7 +129,9 @@ int main(int argc, char* argv[]) {
 
         if (options.listDevices) {
             try {
-                for (const auto& endpoint : od::discoverUsb()) printEndpoint(endpoint);
+                for (const auto& endpoint : od::discoverUsb(std::chrono::seconds(2))) {
+                    printEndpoint(endpoint);
+                }
             } catch (const std::exception& error) {
                 od::log(error.what());
             }

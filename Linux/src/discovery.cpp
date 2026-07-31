@@ -10,8 +10,11 @@
 #include <usbmuxd.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <stdexcept>
+#include <thread>
 
 namespace od {
 namespace {
@@ -24,6 +27,21 @@ struct AvahiContext {
     std::string failure;
     bool daemonReady = false;
 };
+
+std::string usbmuxdFailure(const std::string_view operation, const int result) {
+    std::string message(operation);
+    message += " failed: ";
+    if (result < 0 && result >= -4095) {
+        message += std::strerror(-result);
+    } else {
+        message += "unknown libusbmuxd error";
+    }
+    message += " (error " + std::to_string(result) + ", libusbmuxd ";
+    const char* version = libusbmuxd_version();
+    message += version != nullptr ? version : "unknown";
+    message += "). Confirm `/run/usbmuxd` exists and inspect `journalctl -u usbmuxd.service`";
+    return message;
+}
 
 std::string avahiFailure(const std::string_view operation, const int error) {
     std::string message(operation);
@@ -147,29 +165,48 @@ std::vector<Endpoint> discoverWifi(const std::chrono::milliseconds timeout) {
     return context.endpoints;
 }
 
-std::vector<Endpoint> discoverUsb() {
-    usbmuxd_device_info_t* devices = nullptr;
-    const int count = usbmuxd_get_device_list(&devices);
-    if (count < 0) {
-        throw std::runtime_error("cannot query usbmuxd; is usbmuxd.service running?");
-    }
-    std::vector<Endpoint> endpoints;
-    for (int index = 0; index < count; ++index) {
-        const auto& device = devices[index];
-        if (device.conn_type != CONNECTION_TYPE_USB) {
-            continue;
+std::vector<Endpoint> discoverUsb(const std::chrono::milliseconds timeout) {
+    // One native diagnostic is useful in verbose mode; leaving the library's
+    // global debug level enabled would print the same line on every retry.
+    libusbmuxd_set_debug_level(verboseLogging ? 1 : 0);
+    bool firstQuery = true;
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    int result = 0;
+    do {
+        usbmuxd_device_info_t* devices = nullptr;
+        result = usbmuxd_get_device_list(&devices);
+        if (firstQuery) {
+            libusbmuxd_set_debug_level(0);
+            firstQuery = false;
         }
-        endpoints.push_back(Endpoint{
-            .kind = TransportKind::Usb,
-            .name = "iPhone / iPad",
-            .host = {},
-            .port = 9000,
-            .udid = device.udid,
-            .usbHandle = static_cast<int>(device.handle),
-        });
-    }
-    usbmuxd_device_list_free(&devices);
-    return endpoints;
+        std::vector<Endpoint> endpoints;
+        if (result >= 0) {
+            for (int index = 0; index < result; ++index) {
+                const auto& device = devices[index];
+                if (device.conn_type != CONNECTION_TYPE_USB) {
+                    continue;
+                }
+                endpoints.push_back(Endpoint{
+                    .kind = TransportKind::Usb,
+                    .name = "iPhone / iPad",
+                    .host = {},
+                    .port = 9000,
+                    .udid = device.udid,
+                    .usbHandle = static_cast<int>(device.handle),
+                });
+            }
+        }
+        if (devices != nullptr) {
+            usbmuxd_device_list_free(&devices);
+        }
+        if (!endpoints.empty() || std::chrono::steady_clock::now() >= deadline) {
+            if (result < 0) {
+                throw std::runtime_error(usbmuxdFailure("usbmuxd device query", result));
+            }
+            return endpoints;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    } while (true);
 }
 
 Endpoint chooseEndpoint(const Options& options) {
@@ -180,7 +217,17 @@ Endpoint chooseEndpoint(const Options& options) {
     }
 
     if (options.transport != TransportKind::Wifi) {
-        const auto devices = discoverUsb();
+        std::vector<Endpoint> devices;
+        try {
+            devices = discoverUsb(options.transport == TransportKind::Usb
+                                      ? std::chrono::seconds(5)
+                                      : std::chrono::milliseconds(500));
+        } catch (const std::exception& error) {
+            if (options.transport == TransportKind::Usb) {
+                throw;
+            }
+            debug(std::string("USB discovery unavailable: ") + error.what());
+        }
         const auto found = std::ranges::find_if(devices, [&](const Endpoint& endpoint) {
             return options.udid.empty() || endpoint.udid == options.udid;
         });
@@ -190,7 +237,9 @@ Endpoint chooseEndpoint(const Options& options) {
             return endpoint;
         }
         if (options.transport == TransportKind::Usb) {
-            throw std::runtime_error("no matching USB iOS device found");
+            throw std::runtime_error(
+                "no USB iOS device became ready in usbmuxd. Unlock and reconnect the device, "
+                "accept the Trust prompt, then verify `idevice_id -l` and `idevicepair pair`");
         }
     }
 

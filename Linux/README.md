@@ -19,9 +19,22 @@ For hardware encoding, install the driver for the GPU: `libva-mesa-driver` for A
 able to open `/dev/dri/renderD128`; normal Arch installations grant this through
 the active desktop session.
 
-USB requires the device to be paired with the machine. Start `usbmuxd.service`
-if socket activation does not do so automatically. Wi-Fi discovery requires a
-running Avahi daemon; installing the package does not enable system services:
+USB requires the device to be unlocked and paired with the machine. Accept the
+device's Trust prompt, then verify the usbmuxd path before starting OpenDisplay:
+
+```sh
+idevice_id -l
+idevicepair pair       # first connection only
+idevicepair validate
+```
+
+If `idevice_id` cannot see the device, reconnect the cable and inspect
+`journalctl -u usbmuxd.service`; OpenDisplay cannot use a device that usbmuxd
+has not finished adding. A journal `lockdown error -8` is a failed mux
+preflight: unlock and disconnect the device, restart `usbmuxd.service`, then
+reconnect and accept the Trust prompt. Start the service if socket activation
+does not do so automatically. Wi-Fi discovery requires a running Avahi daemon;
+installing the package does not enable system services:
 
 ```sh
 sudo systemctl enable --now avahi-daemon.service

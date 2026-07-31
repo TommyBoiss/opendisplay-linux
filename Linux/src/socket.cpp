@@ -9,8 +9,10 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <stdexcept>
+#include <thread>
 
 namespace od {
 
@@ -111,11 +113,24 @@ Socket connectTcp(const std::string& host, const std::uint16_t port) {
 }
 
 Socket connectUsb(const int deviceHandle, const std::uint16_t port) {
-    const int fd = usbmuxd_connect(static_cast<std::uint32_t>(deviceHandle), port);
-    if (fd < 0) {
-        throw std::runtime_error("usbmuxd could not connect to device port " + std::to_string(port));
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    int result = -ENODEV;
+    do {
+        result = usbmuxd_connect(static_cast<std::uint32_t>(deviceHandle), port);
+        if (result >= 0) {
+            return Socket(result);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    std::string detail = "unknown libusbmuxd error";
+    if (result < 0 && result >= -4095) {
+        detail = std::strerror(-result);
     }
-    return Socket(fd);
+    throw std::runtime_error("usbmuxd could not connect to device port "
+                             + std::to_string(port) + ": " + detail + " (error "
+                             + std::to_string(result)
+                             + "). Keep the receiver app open and verify `idevicepair validate`");
 }
 
 }  // namespace od
