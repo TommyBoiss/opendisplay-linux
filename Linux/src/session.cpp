@@ -196,6 +196,9 @@ void Session::receiveLoop() {
 }
 
 bool Session::tick() {
+    if (const auto captureError = capture_.error()) {
+        throw std::runtime_error("PipeWire capture failed: " + *captureError);
+    }
     std::deque<Event> events;
     {
         std::lock_guard lock(stateMutex_);

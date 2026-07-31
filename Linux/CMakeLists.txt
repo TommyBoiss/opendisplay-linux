@@ -22,6 +22,7 @@ add_executable(opendisplay-linux
     src/ffmpeg_encoder.cpp
     src/kde_portal.cpp
     src/pipewire_capture.cpp
+    src/pipewire_format.cpp
     src/session.cpp
     src/socket.cpp
     src/wire.cpp
@@ -62,6 +63,15 @@ if(BUILD_TESTING)
     target_compile_options(opendisplay-encoder-tests PRIVATE -UNDEBUG)
     add_test(NAME encoder COMMAND opendisplay-encoder-tests)
     set_tests_properties(encoder PROPERTIES TIMEOUT 15)
+
+    add_executable(opendisplay-pipewire-format-tests
+        tests/pipewire_format_tests.cpp
+        src/pipewire_format.cpp
+    )
+    target_include_directories(opendisplay-pipewire-format-tests PRIVATE include)
+    target_link_libraries(opendisplay-pipewire-format-tests PRIVATE PkgConfig::PIPEWIRE)
+    target_compile_options(opendisplay-pipewire-format-tests PRIVATE -UNDEBUG)
+    add_test(NAME pipewire-format COMMAND opendisplay-pipewire-format-tests)
 endif()
 
 install(TARGETS opendisplay-linux RUNTIME DESTINATION bin)

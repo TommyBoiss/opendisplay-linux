@@ -264,7 +264,9 @@ PortalCapture KdePortal::start(const CaptureMode mode, const int requestedWidth,
         stop();
         throw std::runtime_error("cannot duplicate PipeWire portal descriptor");
     }
-    log("KDE portal session ready; PipeWire node " + std::to_string(stream_.nodeId));
+    log("KDE portal session ready; PipeWire node " + std::to_string(stream_.nodeId)
+        + ", portal size " + std::to_string(stream_.logicalWidth) + "x"
+        + std::to_string(stream_.logicalHeight));
     return PortalCapture{.sessionPath = sessionPath_.toStdString(), .stream = stream_,
                          .pipewireFd = fd};
 }

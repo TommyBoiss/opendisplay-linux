@@ -1,6 +1,7 @@
 #include "opendisplay/pipewire_capture.hpp"
 
 #include "opendisplay/log.hpp"
+#include "opendisplay/pipewire_format.hpp"
 
 #include <spa/param/format-utils.h>
 #include <spa/param/video/raw.h>
@@ -9,8 +10,10 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 
 namespace od {
@@ -25,13 +28,23 @@ const pw_stream_events streamEvents = [] {
     return events;
 }();
 
-VideoFormat::PixelFormat pixelFormat(const spa_video_format format) {
+std::optional<VideoFormat::PixelFormat> pixelFormat(const spa_video_format format) {
     switch (format) {
     case SPA_VIDEO_FORMAT_BGRA: return VideoFormat::PixelFormat::Bgra;
     case SPA_VIDEO_FORMAT_BGRx: return VideoFormat::PixelFormat::Bgrx;
     case SPA_VIDEO_FORMAT_RGBA: return VideoFormat::PixelFormat::Rgba;
     case SPA_VIDEO_FORMAT_RGBx: return VideoFormat::PixelFormat::Rgbx;
-    default: return VideoFormat::PixelFormat::Bgra;
+    default: return std::nullopt;
+    }
+}
+
+const char* pixelFormatName(const spa_video_format format) {
+    switch (format) {
+    case SPA_VIDEO_FORMAT_BGRA: return "BGRA";
+    case SPA_VIDEO_FORMAT_BGRx: return "BGRx";
+    case SPA_VIDEO_FORMAT_RGBA: return "RGBA";
+    case SPA_VIDEO_FORMAT_RGBx: return "RGBx";
+    default: return "unknown";
     }
 }
 
@@ -42,6 +55,11 @@ PipeWireCapture::~PipeWireCapture() { stop(); }
 void PipeWireCapture::start(const int remoteFd, const std::uint32_t nodeId, const int width,
                             const int height, const int fps, FrameCallback callback) {
     stop();
+    {
+        std::lock_guard lock(stateMutex_);
+        state_ = PW_STREAM_STATE_UNCONNECTED;
+        error_.clear();
+    }
     static std::once_flag initialized;
     std::call_once(initialized, [] { pw_init(nullptr, nullptr); });
 
@@ -79,18 +97,8 @@ void PipeWireCapture::start(const int remoteFd, const std::uint32_t nodeId, cons
 
     std::uint8_t storage[1024]{};
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(storage, sizeof(storage));
-    const spa_rectangle requestedSize = SPA_RECTANGLE(
-        static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height));
-    const spa_fraction requestedRate = SPA_FRACTION(static_cast<std::uint32_t>(fps), 1);
     const spa_pod* parameters[1];
-    parameters[0] = static_cast<spa_pod*>(spa_pod_builder_add_object(
-        &builder,
-        SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
-        SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video),
-        SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
-        SPA_FORMAT_VIDEO_format, SPA_POD_Id(SPA_VIDEO_FORMAT_BGRA),
-        SPA_FORMAT_VIDEO_size, SPA_POD_Rectangle(&requestedSize),
-        SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&requestedRate)));
+    parameters[0] = buildPipeWireFormatOffer(builder, width, height, fps);
 
     const auto flags = static_cast<pw_stream_flags>(PW_STREAM_FLAG_AUTOCONNECT
         | PW_STREAM_FLAG_MAP_BUFFERS);
@@ -104,6 +112,20 @@ void PipeWireCapture::start(const int remoteFd, const std::uint32_t nodeId, cons
     if (pw_thread_loop_start(loop_) < 0) {
         stop();
         throw std::runtime_error("cannot start PipeWire thread loop");
+    }
+
+    std::unique_lock lock(stateMutex_);
+    const bool configured = stateCondition_.wait_for(lock, std::chrono::seconds(10), [this] {
+        return state_ == PW_STREAM_STATE_PAUSED || state_ == PW_STREAM_STATE_STREAMING
+            || state_ == PW_STREAM_STATE_ERROR || !error_.empty();
+    });
+    if (!configured || state_ == PW_STREAM_STATE_ERROR || !error_.empty()) {
+        const std::string failure = !configured
+            ? "timed out while negotiating a video format"
+            : (error_.empty() ? "unknown stream error" : error_);
+        lock.unlock();
+        stop();
+        throw std::runtime_error("PipeWire capture failed: " + failure);
     }
 }
 
@@ -132,8 +154,25 @@ void PipeWireCapture::stop() {
     format_ = {};
 }
 
-void PipeWireCapture::stateChanged(void*, pw_stream_state, const pw_stream_state state,
+std::optional<std::string> PipeWireCapture::error() const {
+    std::lock_guard lock(stateMutex_);
+    if (error_.empty()) {
+        return std::nullopt;
+    }
+    return error_;
+}
+
+void PipeWireCapture::stateChanged(void* data, pw_stream_state, const pw_stream_state state,
                                    const char* error) {
+    auto& self = *static_cast<PipeWireCapture*>(data);
+    {
+        std::lock_guard lock(self.stateMutex_);
+        self.state_ = state;
+        if (state == PW_STREAM_STATE_ERROR) {
+            self.error_ = error != nullptr ? error : "unknown stream error";
+        }
+    }
+    self.stateCondition_.notify_all();
     if (state == PW_STREAM_STATE_ERROR) {
         log(std::string("PipeWire stream error: ") + (error != nullptr ? error : "unknown"));
     } else if (state == PW_STREAM_STATE_STREAMING) {
@@ -147,13 +186,25 @@ void PipeWireCapture::parameterChanged(void* data, const std::uint32_t id,
     if (parameter == nullptr || id != SPA_PARAM_Format) {
         return;
     }
-    if (spa_format_video_raw_parse(parameter, &self.format_) < 0) {
-        log("PipeWire returned an unsupported video format");
+    spa_video_info_raw negotiated{};
+    if (spa_format_video_raw_parse(parameter, &negotiated) < 0
+        || !pixelFormat(negotiated.format)) {
+        constexpr auto message = "PipeWire returned an unsupported video format";
+        log(message);
         self.format_ = {};
+        {
+            std::lock_guard lock(self.stateMutex_);
+            self.error_ = message;
+        }
+        self.stateCondition_.notify_all();
         return;
     }
+    self.format_ = negotiated;
     log("PipeWire format: " + std::to_string(self.format_.size.width) + "x"
-        + std::to_string(self.format_.size.height));
+        + std::to_string(self.format_.size.height) + " "
+        + pixelFormatName(self.format_.format) + " @ "
+        + std::to_string(self.format_.framerate.num) + "/"
+        + std::to_string(self.format_.framerate.denom) + " fps");
 }
 
 void PipeWireCapture::process(void* data) {
@@ -195,7 +246,7 @@ void PipeWireCapture::handleProcess() {
         .fps = format_.framerate.denom > 0
             ? static_cast<int>(format_.framerate.num / format_.framerate.denom)
             : 60,
-        .pixelFormat = pixelFormat(format_.format),
+        .pixelFormat = *pixelFormat(format_.format),
     };
     frame.capturedAtMs = wallClockMs();
     frame.sequence = sequence_.fetch_add(1);

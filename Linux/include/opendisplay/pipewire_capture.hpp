@@ -6,9 +6,12 @@
 #include <spa/param/video/format-utils.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <optional>
+#include <string>
 
 namespace od {
 
@@ -24,6 +27,7 @@ public:
     void start(int remoteFd, std::uint32_t nodeId, int width, int height, int fps,
                FrameCallback callback);
     void stop();
+    [[nodiscard]] std::optional<std::string> error() const;
 
     // PipeWire's C callbacks are public only so the static event table can
     // reference them; callers should use start()/stop().
@@ -43,6 +47,10 @@ private:
     spa_video_info_raw format_{};
     FrameCallback callback_;
     std::atomic<std::uint64_t> sequence_ = 0;
+    mutable std::mutex stateMutex_;
+    std::condition_variable stateCondition_;
+    pw_stream_state state_ = PW_STREAM_STATE_UNCONNECTED;
+    std::string error_;
 };
 
 }  // namespace od
