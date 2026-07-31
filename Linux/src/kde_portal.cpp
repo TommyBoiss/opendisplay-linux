@@ -136,16 +136,38 @@ std::optional<PortalStream> KdePortal::firstStream(const QVariant& raw, const in
     if (!value.canConvert<QDBusArgument>()) {
         return std::nullopt;
     }
-    auto argument = value.value<QDBusArgument>();
+    // Portal replies are unmarshalled as read-only QDBusArgument objects.
+    // Keeping this copy const is significant: Qt overloads beginArray() and
+    // beginStructure() for read vs. write mode based on constness.
+    const auto argument = value.value<QDBusArgument>();
+    debug("Portal streams D-Bus signature: " + argument.currentSignature().toStdString());
+    if (argument.currentType() != QDBusArgument::ArrayType) {
+        return std::nullopt;
+    }
     argument.beginArray();
     if (argument.atEnd()) {
+        argument.endArray();
+        return std::nullopt;
+    }
+    if (argument.currentType() != QDBusArgument::StructureType) {
         argument.endArray();
         return std::nullopt;
     }
     PortalStream stream;
     QVariantMap properties;
     argument.beginStructure();
-    argument >> stream.nodeId >> properties;
+    if (argument.currentType() != QDBusArgument::BasicType) {
+        argument.endStructure();
+        argument.endArray();
+        return std::nullopt;
+    }
+    argument >> stream.nodeId;
+    if (argument.currentType() != QDBusArgument::MapType) {
+        argument.endStructure();
+        argument.endArray();
+        return std::nullopt;
+    }
+    argument >> properties;
     argument.endStructure();
     argument.endArray();
     stream.logicalWidth = fallbackWidth;
@@ -153,10 +175,12 @@ std::optional<PortalStream> KdePortal::firstStream(const QVariant& raw, const in
 
     const auto sizeValue = unwrap(properties.value(QStringLiteral("size")));
     if (sizeValue.canConvert<QDBusArgument>()) {
-        auto size = sizeValue.value<QDBusArgument>();
-        size.beginStructure();
-        size >> stream.logicalWidth >> stream.logicalHeight;
-        size.endStructure();
+        const auto size = sizeValue.value<QDBusArgument>();
+        if (size.currentType() == QDBusArgument::StructureType) {
+            size.beginStructure();
+            size >> stream.logicalWidth >> stream.logicalHeight;
+            size.endStructure();
+        }
     }
     return stream;
 }
