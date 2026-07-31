@@ -13,7 +13,9 @@ optdepends=('libva-mesa-driver: VA-API support for AMD GPUs'
             'nvidia-utils: NVENC support for NVIDIA GPUs')
 provides=('opendisplay-linux')
 conflicts=('opendisplay-linux')
-source=("git+$url.git")
+_giturl="https://gitea.camphorwood.tixwho.com/tixwho/opendisplay.git"
+_branch="linux-port"
+source=("opendisplay::git+${_giturl}#branch=${_branch}")
 sha256sums=('SKIP')
 
 pkgver() {
@@ -22,9 +24,15 @@ pkgver() {
 }
 
 build() {
-  cmake -S opendisplay/Linux -B build -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=OFF
-  cmake --build build
+  cmake -S opendisplay/Linux -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=ON
+  cmake --build build --parallel
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
 }
 
 package() {
