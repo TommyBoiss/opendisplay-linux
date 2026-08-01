@@ -7,6 +7,7 @@
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QCoreApplication>
+#include <QRegularExpression>
 #include <QTimer>
 
 #include <atomic>
@@ -43,6 +44,79 @@ od::EncoderKind encoder(const QString& value) {
     if (value == QStringLiteral("nvenc")) return od::EncoderKind::Nvenc;
     if (value == QStringLiteral("software")) return od::EncoderKind::Software;
     throw std::runtime_error("--encoder must be auto, vaapi, nvenc, or software");
+}
+
+od::ExtendDirection extendDirection(const QString& value) {
+    if (value == QStringLiteral("left")) return od::ExtendDirection::Left;
+    if (value == QStringLiteral("right")) return od::ExtendDirection::Right;
+    if (value == QStringLiteral("top")) return od::ExtendDirection::Top;
+    if (value == QStringLiteral("bottom")) return od::ExtendDirection::Bottom;
+    throw std::runtime_error("--extend-to must be left, right, top, or bottom");
+}
+
+od::AlignDirection alignDirection(const QString& value) {
+    if (value == QStringLiteral("left")) return od::AlignDirection::Left;
+    if (value == QStringLiteral("right")) return od::AlignDirection::Right;
+    if (value == QStringLiteral("top")) return od::AlignDirection::Top;
+    if (value == QStringLiteral("bottom")) return od::AlignDirection::Bottom;
+    if (value == QStringLiteral("center")) return od::AlignDirection::Center;
+    throw std::runtime_error("--align-to must be left, right, top, bottom, or center");
+}
+
+od::Size size(const QString& value, const std::string& option) {
+    static const QRegularExpression pattern(QStringLiteral(R"(^(\d+)[xX](\d+)$)"));
+    const auto match = pattern.match(value);
+    if (!match.hasMatch()) {
+        throw std::runtime_error(option + " must use WIDTHxHEIGHT");
+    }
+    const od::Size result{.width = match.captured(1).toInt(),
+                          .height = match.captured(2).toInt()};
+    if (result.width < 2 || result.height < 2 || result.width > 65'535
+        || result.height > 65'535) {
+        throw std::runtime_error(option + " dimensions must be between 2 and 65535");
+    }
+    return result;
+}
+
+od::PhysicalSize physicalSize(const QString& value, const std::string& option) {
+    static const QRegularExpression pattern(
+        QStringLiteral(R"(^([0-9]+(?:\.[0-9]+)?)[xX]([0-9]+(?:\.[0-9]+)?)$)"));
+    const auto match = pattern.match(value);
+    if (!match.hasMatch()) {
+        throw std::runtime_error(option + " must use WIDTHxHEIGHT in millimetres");
+    }
+    const od::PhysicalSize result{.widthMm = match.captured(1).toDouble(),
+                                  .heightMm = match.captured(2).toDouble()};
+    if (result.widthMm <= 0 || result.heightMm <= 0) {
+        throw std::runtime_error(option + " dimensions must be positive");
+    }
+    return result;
+}
+
+od::Rect geometry(const QString& value) {
+    static const QRegularExpression pattern(
+        QStringLiteral(R"(^(\d+)[xX](\d+)([+-]\d+)([+-]\d+)$)"));
+    const auto match = pattern.match(value);
+    if (!match.hasMatch()) {
+        throw std::runtime_error("--reference-geometry must use WIDTHxHEIGHT+X+Y");
+    }
+    const od::Rect result{.x = match.captured(3).toInt(),
+                          .y = match.captured(4).toInt(),
+                          .width = match.captured(1).toInt(),
+                          .height = match.captured(2).toInt()};
+    if (result.width <= 0 || result.height <= 0) {
+        throw std::runtime_error("--reference-geometry dimensions must be positive");
+    }
+    return result;
+}
+
+double displayScale(const QString& value, const std::string& option) {
+    bool valid = false;
+    const double result = value.toDouble(&valid);
+    if (!valid || result < 0.5 || result > 4.0) {
+        throw std::runtime_error(option + " must be between 0.5 and 4.0");
+    }
+    return result;
 }
 
 int positiveInt(const QCommandLineParser& parser, const QCommandLineOption& option) {
@@ -93,12 +167,39 @@ int main(int argc, char* argv[]) {
                                             "bps", "18000000");
     const QCommandLineOption scaleOption("scale", "Encoded resolution multiplier.", "factor",
                                           "1.0");
+    const QCommandLineOption referenceOption("reference-monitor",
+        "Reference monitor name or KScreen id (required when multiple are enabled).", "output");
+    const QCommandLineOption extendOption("extend-to",
+        "Place the virtual monitor on this side: left, right, top, or bottom.",
+        "side", "right");
+    const QCommandLineOption alignOption("align-to",
+        "Align its perpendicular edge: top/bottom/left/right/center.", "edge", "bottom");
+    const QCommandLineOption virtualResolutionOption("virtual-resolution",
+        "Override the receiver-native virtual mode.", "WIDTHxHEIGHT");
+    const QCommandLineOption displayScaleOption({"display-scale", "virtual-scale"},
+        "Override the auto-selected KDE output scale.", "factor");
+    const QCommandLineOption virtualRefreshOption("virtual-refresh",
+        "Override virtual-output refresh (defaults to --fps).", "hz");
+    const QCommandLineOption referenceGeometryOption("reference-geometry",
+        "Override detected reference logical geometry.", "WIDTHxHEIGHT+X+Y");
+    const QCommandLineOption referenceResolutionOption("reference-resolution",
+        "Override detected reference pixel resolution for scale calculations.", "WIDTHxHEIGHT");
+    const QCommandLineOption referenceScaleOption("reference-scale",
+        "Override detected reference scale for calculations.", "factor");
+    const QCommandLineOption referenceSizeOption("reference-size-mm",
+        "Override detected reference physical dimensions.", "WIDTHxHEIGHT");
+    const QCommandLineOption receiverSizeOption({"ipad-size-mm", "receiver-size-mm"},
+        "Receiver panel dimensions for physical-DPI auto scaling.", "WIDTHxHEIGHT");
     const QCommandLineOption noInputOption("no-input", "Do not request pointer control.");
     const QCommandLineOption listOption({"l", "list"}, "List visible Wi-Fi and USB receivers.");
     const QCommandLineOption verboseOption("verbose", "Enable diagnostic logging.");
     parser.addOptions({transportOption, hostOption, portOption, serviceOption, udidOption,
                        modeOption, encoderOption, vaapiOption, fpsOption, bitrateOption,
-                       scaleOption, noInputOption, listOption, verboseOption});
+                       scaleOption, referenceOption, extendOption, alignOption,
+                       virtualResolutionOption, displayScaleOption, virtualRefreshOption,
+                       referenceGeometryOption, referenceResolutionOption,
+                       referenceScaleOption, referenceSizeOption, receiverSizeOption,
+                       noInputOption, listOption, verboseOption});
     parser.process(application);
 
     try {
@@ -121,6 +222,46 @@ int main(int argc, char* argv[]) {
         options.scale = parser.value(scaleOption).toDouble(&scaleValid);
         if (!scaleValid || options.scale <= 0 || options.scale > 1) {
             throw std::runtime_error("--scale must be greater than 0 and at most 1");
+        }
+        options.display.referenceMonitor = parser.value(referenceOption).toStdString();
+        options.display.extendTo = extendDirection(parser.value(extendOption));
+        if (parser.isSet(alignOption)) {
+            options.display.alignTo = alignDirection(parser.value(alignOption));
+        } else if (options.display.extendTo == od::ExtendDirection::Top
+                   || options.display.extendTo == od::ExtendDirection::Bottom) {
+            // Keep the default corner at bottom-right when only the extension
+            // axis is changed: vertical extensions align their right edges.
+            options.display.alignTo = od::AlignDirection::Right;
+        }
+        if (parser.isSet(virtualResolutionOption)) {
+            options.display.virtualResolution = size(
+                parser.value(virtualResolutionOption), "--virtual-resolution");
+        }
+        if (parser.isSet(displayScaleOption)) {
+            options.display.virtualScale = displayScale(
+                parser.value(displayScaleOption), "--display-scale");
+        }
+        if (parser.isSet(virtualRefreshOption)) {
+            options.display.refreshRate = positiveInt(parser, virtualRefreshOption);
+        }
+        if (parser.isSet(referenceGeometryOption)) {
+            options.display.referenceGeometry = geometry(parser.value(referenceGeometryOption));
+        }
+        if (parser.isSet(referenceResolutionOption)) {
+            options.display.referenceResolution = size(
+                parser.value(referenceResolutionOption), "--reference-resolution");
+        }
+        if (parser.isSet(referenceScaleOption)) {
+            options.display.referenceScale = displayScale(
+                parser.value(referenceScaleOption), "--reference-scale");
+        }
+        if (parser.isSet(referenceSizeOption)) {
+            options.display.referencePhysicalSize = physicalSize(
+                parser.value(referenceSizeOption), "--reference-size-mm");
+        }
+        if (parser.isSet(receiverSizeOption)) {
+            options.display.receiverPhysicalSize = physicalSize(
+                parser.value(receiverSizeOption), "--ipad-size-mm");
         }
         options.input = !parser.isSet(noInputOption);
         options.listDevices = parser.isSet(listOption);

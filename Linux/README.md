@@ -10,7 +10,8 @@ H.264 produced by FFmpeg. There is no desktop GUI.
 
 ```sh
 sudo pacman -S --needed base-devel cmake qt6-base pipewire avahi \
-  libusbmuxd usbmuxd ffmpeg xdg-desktop-portal xdg-desktop-portal-kde
+  libusbmuxd usbmuxd ffmpeg libkscreen \
+  xdg-desktop-portal xdg-desktop-portal-kde
 ```
 
 For hardware encoding, install the driver for the GPU: `libva-mesa-driver` for AMD,
@@ -82,6 +83,40 @@ control. Other useful forms are:
 ./build/linux/opendisplay-linux --encoder nvenc --mode mirror --no-input
 ```
 
+### Virtual monitor layout
+
+In extend mode, OpenDisplay queries `kscreen-doctor -j` before opening the KDE
+portal. One enabled monitor is selected automatically; with two or more, pass
+its connector name or KScreen id explicitly:
+
+```sh
+opendisplay-linux --reference-monitor DP-1
+opendisplay-linux --reference-monitor eDP-1 --extend-to right --align-to bottom
+opendisplay-linux --extend-to bottom --align-to right
+```
+
+The default is bottom-right: extend right and align bottom. Left/right extension
+accepts `top`, `bottom`, or `center` alignment; top/bottom extension accepts
+`left`, `right`, or `center`. Positions use KDE logical coordinates.
+
+The automatic mode starts with the iPad's native pixels. It uses physical DPI
+when both panel sizes are available, otherwise the iOS-reported native scale;
+the result is rounded to a 0.05 scale step. Pixel dimensions are nudged to the
+nearest even values that produce integer logical dimensions. Detection and any
+part of the calculation can be overridden:
+
+```sh
+opendisplay-linux --virtual-resolution 2420x1668 --display-scale 1.25
+opendisplay-linux --virtual-refresh 60 --ipad-size-mm 263x181
+opendisplay-linux --reference-resolution 3840x2160 --reference-scale 1.5 \
+  --reference-size-mm 597x336
+opendisplay-linux --reference-geometry 2560x1440+0+0
+```
+
+`--scale` remains the video encoder resolution multiplier and does not change
+KDE display scaling. Custom virtual modes require Plasma/libkscreen 6.6 or
+newer; `libkscreen` supplies `kscreen-doctor`.
+
 If Bonjour discovery is unavailable, confirm that the phone app is open and
 inspect the advertised service with `avahi-browse -rt _opensidecar._tcp`.
 You can bypass Avahi when the receiver's address is known:
@@ -100,6 +135,7 @@ KDE Plasma Wayland is the only supported desktop. Portal support determines
 whether true virtual-output extension is available; `--mode mirror` is the
 fallback on systems whose portal cannot create a virtual source. Audio,
 clipboard, cursor sprites, encryption, reconnection, and multi-device sessions
-remain out of scope. The platform boundary is isolated in `KdePortal`, so later
-wlroots and other compositor implementations need not change transport,
-protocol, or encoding code.
+remain out of scope. Compositor-neutral layout lives in `display_layout`, while
+KScreen operations are isolated in `KdeOutputController` and portal capture in
+`KdePortal`. Later wlroots controllers need not change transport, protocol,
+layout planning, or encoding code.

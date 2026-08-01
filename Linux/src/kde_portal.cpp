@@ -19,7 +19,9 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <stdexcept>
+#include <vector>
 
 namespace od {
 namespace {
@@ -185,9 +187,34 @@ std::optional<PortalStream> KdePortal::firstStream(const QVariant& raw, const in
     return stream;
 }
 
-PortalCapture KdePortal::start(const CaptureMode mode, const int requestedWidth,
-                               const int requestedHeight, const bool requestInput) {
+PortalCapture KdePortal::start(const DesktopRequest& desktopRequest) {
     stop();
+    const auto mode = desktopRequest.mode;
+    const auto requestInput = desktopRequest.requestInput;
+    std::vector<DisplayOutput> outputsBefore;
+    std::optional<DisplayLayout> layout;
+    if (mode == CaptureMode::Extend) {
+        outputsBefore = outputs_.outputs();
+        outputsBefore_ = outputsBefore;
+        const auto reference = selectReferenceOutput(
+            outputsBefore, desktopRequest.display.referenceMonitor);
+        layout = planDisplayLayout(reference, desktopRequest.receiver,
+                                   desktopRequest.display, desktopRequest.refreshRate);
+        log("Reference monitor: " + reference.name + " "
+            + std::to_string(layout->reference.resolution.width) + 'x'
+            + std::to_string(layout->reference.resolution.height) + " at scale "
+            + std::to_string(layout->reference.scale));
+        if (layout->usedPhysicalSizing) {
+            debug("Virtual scale derived from reference and receiver physical sizes");
+        } else if (!desktopRequest.display.virtualScale) {
+            debug("Virtual scale derived from the receiver native scale");
+        }
+        if (layout->adjustedResolution) {
+            debug("Adjusted virtual resolution for integer logical geometry: "
+                  + std::to_string(layout->resolution.width) + 'x'
+                  + std::to_string(layout->resolution.height));
+        }
+    }
     QDBusInterface screenCast(portalService, portalPath, screenCastInterface, bus_);
     const auto availableSources = screenCast.property("AvailableSourceTypes");
     const auto availableCursorModes = screenCast.property("AvailableCursorModes");
@@ -240,6 +267,8 @@ PortalCapture KdePortal::start(const CaptureMode mode, const int requestedWidth,
 
     const auto started = request(remoteDesktopInterface, QStringLiteral("Start"),
                                  {QVariant::fromValue(QDBusObjectPath(sessionPath_)), QString()}, {});
+    const int requestedWidth = std::max(2, desktopRequest.receiver.pixelsWide);
+    const int requestedHeight = std::max(2, desktopRequest.receiver.pixelsHigh);
     const auto parsed = firstStream(started.value(QStringLiteral("streams")),
                                     std::max(1, requestedWidth / 2),
                                     std::max(1, requestedHeight / 2));
@@ -249,6 +278,23 @@ PortalCapture KdePortal::start(const CaptureMode mode, const int requestedWidth,
     }
     stream_ = *parsed;
     inputEnabled_ = requestInput;
+    int captureWidth = requestedWidth;
+    int captureHeight = requestedHeight;
+    if (layout) {
+        try {
+            const auto virtualOutput = outputs_.waitForAddedOutput(
+                outputsBefore, std::chrono::seconds(5));
+            virtualOutput_ = virtualOutput;
+            outputTranslation_ = outputs_.apply(virtualOutput, *layout);
+        } catch (...) {
+            stop();
+            throw;
+        }
+        stream_.logicalWidth = layout->logicalGeometry.width;
+        stream_.logicalHeight = layout->logicalGeometry.height;
+        captureWidth = layout->resolution.width;
+        captureHeight = layout->resolution.height;
+    }
 
     auto open = QDBusMessage::createMethodCall(portalService, portalPath, screenCastInterface,
                                                 QStringLiteral("OpenPipeWireRemote"));
@@ -268,7 +314,8 @@ PortalCapture KdePortal::start(const CaptureMode mode, const int requestedWidth,
         + ", portal size " + std::to_string(stream_.logicalWidth) + "x"
         + std::to_string(stream_.logicalHeight));
     return PortalCapture{.sessionPath = sessionPath_.toStdString(), .stream = stream_,
-                         .pipewireFd = fd};
+                         .pipewireFd = fd, .captureWidth = captureWidth,
+                         .captureHeight = captureHeight};
 }
 
 void KdePortal::stop() {
@@ -279,6 +326,29 @@ void KdePortal::stop() {
                                                 QStringLiteral("Close"));
     bus_.call(close, QDBus::NoBlock);
     sessionPath_.clear();
+    bool virtualOutputRemoved = false;
+    if (virtualOutput_) {
+        try {
+            virtualOutputRemoved = outputs_.waitForRemovedOutput(
+                *virtualOutput_, std::chrono::seconds(3));
+            if (!virtualOutputRemoved) {
+                debug("Timed out waiting for KDE to remove virtual output "
+                      + virtualOutput_->name);
+            }
+        } catch (const std::exception& error) {
+            debug(std::string("Cannot verify KDE virtual output removal: ") + error.what());
+        }
+        virtualOutput_.reset();
+    }
+    if (virtualOutputRemoved && (outputTranslation_.x != 0 || outputTranslation_.y != 0)) {
+        try {
+            outputs_.restorePositions(outputsBefore_);
+        } catch (const std::exception& error) {
+            debug(std::string("Cannot restore KDE output positions: ") + error.what());
+        }
+    }
+    outputsBefore_.clear();
+    outputTranslation_ = {};
     stream_ = {};
     inputEnabled_ = false;
     pointerDown_ = false;

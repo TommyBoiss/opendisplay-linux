@@ -18,8 +18,10 @@ pkg_check_modules(USBMUXD REQUIRED IMPORTED_TARGET libusbmuxd-2.0)
 add_executable(opendisplay-linux
     include/opendisplay/kde_portal.hpp
     src/main.cpp
+    src/display_layout.cpp
     src/discovery.cpp
     src/ffmpeg_encoder.cpp
+    src/kde_output_controller.cpp
     src/kde_portal.cpp
     src/pipewire_capture.cpp
     src/pipewire_format.cpp
@@ -44,6 +46,14 @@ target_compile_options(opendisplay-linux PRIVATE
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(opendisplay-display-layout-tests
+        tests/display_layout_tests.cpp
+        src/display_layout.cpp
+    )
+    target_include_directories(opendisplay-display-layout-tests PRIVATE include)
+    target_compile_options(opendisplay-display-layout-tests PRIVATE -UNDEBUG)
+    add_test(NAME display-layout COMMAND opendisplay-display-layout-tests)
+
     add_executable(opendisplay-wire-tests
         tests/wire_tests.cpp
         src/wire.cpp

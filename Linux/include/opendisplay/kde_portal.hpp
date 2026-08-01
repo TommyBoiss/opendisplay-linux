@@ -1,6 +1,7 @@
 #pragma once
 
 #include "opendisplay/desktop_backend.hpp"
+#include "opendisplay/kde_output_controller.hpp"
 
 #include <QDBusConnection>
 #include <QVariantMap>
@@ -9,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace od {
 
@@ -22,8 +24,7 @@ public:
     explicit KdePortal(QObject* parent = nullptr);
     ~KdePortal() override;
 
-    PortalCapture start(CaptureMode mode, int requestedWidth, int requestedHeight,
-                        bool requestInput) override;
+    PortalCapture start(const DesktopRequest& request) override;
     void stop() override;
     void pointer(std::string_view phase, double normalizedX, double normalizedY) override;
     void scroll(double dx, double dy) override;
@@ -48,6 +49,10 @@ private:
     bool waiting_ = false;
     uint responseCode_ = 2;
     QVariantMap responseResults_;
+    KdeOutputController outputs_;
+    std::optional<DisplayOutput> virtualOutput_;
+    std::vector<DisplayOutput> outputsBefore_;
+    OutputTranslation outputTranslation_;
 };
 
 }  // namespace od

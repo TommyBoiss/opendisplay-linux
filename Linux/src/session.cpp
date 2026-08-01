@@ -71,7 +71,13 @@ void Session::startPipeline(const PhoneInfo& phone) {
         & ~1;
     const int outputHeight = std::max(2, static_cast<int>(std::lround(nativeHeight * options_.scale)))
         & ~1;
-    const auto capture = desktop_->start(options_.mode, nativeWidth, nativeHeight, options_.input);
+    const auto capture = desktop_->start(DesktopRequest{
+        .mode = options_.mode,
+        .receiver = phone,
+        .display = options_.display,
+        .refreshRate = options_.fps,
+        .requestInput = options_.input,
+    });
     bool pipewireFdHandedOff = false;
     try {
         encoder_.start(EncoderConfig{
@@ -88,8 +94,8 @@ void Session::startPipeline(const PhoneInfo& phone) {
             send(wire::videoPayload(frame, wallClockMs()));
         });
         pipewireFdHandedOff = true;
-        capture_.start(capture.pipewireFd, capture.stream.nodeId, nativeWidth, nativeHeight,
-                       options_.fps, [this](CapturedFrame frame) {
+        capture_.start(capture.pipewireFd, capture.stream.nodeId, capture.captureWidth,
+                       capture.captureHeight, options_.fps, [this](CapturedFrame frame) {
                            encoder_.submit(std::move(frame));
                        });
         pipelineRunning_ = true;

@@ -9,6 +9,39 @@ namespace od {
 enum class TransportKind { Auto, Wifi, Usb };
 enum class CaptureMode { Extend, Mirror };
 enum class EncoderKind { Auto, Vaapi, Nvenc, Software };
+enum class ExtendDirection { Left, Right, Top, Bottom };
+enum class AlignDirection { Left, Right, Top, Bottom, Center };
+
+struct Size {
+    int width = 0;
+    int height = 0;
+};
+
+struct Rect {
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+};
+
+struct PhysicalSize {
+    double widthMm = 0;
+    double heightMm = 0;
+};
+
+struct DisplayOptions {
+    std::string referenceMonitor;
+    ExtendDirection extendTo = ExtendDirection::Right;
+    AlignDirection alignTo = AlignDirection::Bottom;
+    std::optional<Size> virtualResolution;
+    std::optional<double> virtualScale;
+    std::optional<Rect> referenceGeometry;
+    std::optional<Size> referenceResolution;
+    std::optional<double> referenceScale;
+    std::optional<PhysicalSize> referencePhysicalSize;
+    std::optional<PhysicalSize> receiverPhysicalSize;
+    std::optional<int> refreshRate;
+};
 
 struct PhoneInfo {
     int pixelsWide = 0;
@@ -63,10 +96,10 @@ struct Options {
     int fps = 60;
     int bitrate = 18'000'000;
     double scale = 1.0;
+    DisplayOptions display;
     bool input = true;
     bool listDevices = false;
     bool verbose = false;
 };
 
 }  // namespace od
-

@@ -18,6 +18,16 @@ struct PortalCapture {
     std::string sessionPath;
     PortalStream stream;
     int pipewireFd = -1;
+    int captureWidth = 0;
+    int captureHeight = 0;
+};
+
+struct DesktopRequest {
+    CaptureMode mode = CaptureMode::Extend;
+    PhoneInfo receiver;
+    DisplayOptions display;
+    int refreshRate = 60;
+    bool requestInput = true;
 };
 
 /// Compositor-specific output/capture authorization and input injection.
@@ -25,8 +35,7 @@ struct PortalCapture {
 class DesktopBackend {
 public:
     virtual ~DesktopBackend() = default;
-    virtual PortalCapture start(CaptureMode mode, int requestedWidth, int requestedHeight,
-                                bool requestInput) = 0;
+    virtual PortalCapture start(const DesktopRequest& request) = 0;
     virtual void stop() = 0;
     virtual void pointer(std::string_view phase, double normalizedX, double normalizedY) = 0;
     virtual void scroll(double dx, double dy) = 0;
