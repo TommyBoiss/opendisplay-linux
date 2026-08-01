@@ -51,10 +51,19 @@ void producesCurrentHyprlandMonitorExpression() {
                          "\"2420x1668@60\", position = \"1707x233\", scale = 2 })");
 }
 
+void rejectsSemanticHyprctlErrorsWithZeroExitStatus() {
+    assert(od::hyprlandCommandResponseAccepted(true, "ok"));
+    assert(od::hyprlandCommandResponseAccepted(true, ""));
+    assert(!od::hyprlandCommandResponseAccepted(
+        true, "eval is only supported with the lua config manager"));
+    assert(!od::hyprlandCommandResponseAccepted(false, "ok"));
+}
+
 }  // namespace
 
 int main() {
     detectsDesktopWithoutChangingLegacyFallback();
     parsesHyprctlMonitorJson();
     producesCurrentHyprlandMonitorExpression();
+    rejectsSemanticHyprctlErrorsWithZeroExitStatus();
 }

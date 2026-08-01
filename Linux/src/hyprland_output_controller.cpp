@@ -51,7 +51,15 @@ std::string outputSnapshot(const std::vector<DisplayOutput>& outputs) {
         if (!first) result << ", ";
         result << output.name << ' ' << output.resolution.width << 'x'
                << output.resolution.height << '+' << output.logicalGeometry.x << '+'
-               << output.logicalGeometry.y << " scale " << output.scale;
+               << output.logicalGeometry.y << " scale " << output.scale << " modes [";
+        bool firstMode = true;
+        for (const auto& mode : output.modes) {
+            if (!firstMode) result << ", ";
+            result << mode.size.width << 'x' << mode.size.height << '@'
+                   << mode.refreshRate;
+            firstMode = false;
+        }
+        result << ']';
         first = false;
     }
     return result.str();
@@ -73,6 +81,11 @@ std::optional<DisplayOutput> findOutput(const std::vector<DisplayOutput>& output
 }
 
 }  // namespace
+
+bool hyprlandCommandResponseAccepted(const bool processSucceeded,
+                                     const std::string_view output) {
+    return processSucceeded && (output.empty() || output == "ok");
+}
 
 std::vector<DisplayOutput> parseHyprlandOutputs(const std::string_view json) {
     QJsonParseError error;
@@ -153,34 +166,24 @@ std::vector<DisplayOutput> HyprlandOutputController::outputs() const {
     return parseHyprlandOutputs(result.output);
 }
 
-void HyprlandOutputController::create(const std::string& outputName) const {
+DisplayOutput HyprlandOutputController::create(const std::string& outputName,
+                                               const DisplayLayout& layout) const {
     if (findOutput(outputs(), outputName)) {
         throw std::runtime_error("Hyprland output '" + outputName + "' already exists");
     }
-    const auto result = hyprctl({QStringLiteral("output"), QStringLiteral("create"),
-                                 QStringLiteral("headless"),
-                                 QString::fromStdString(outputName)});
-    if (!result.success) {
-        throw std::runtime_error("Hyprland could not create headless output '" + outputName
-                                 + "': " + result.output);
-    }
-    QElapsedTimer timer;
-    timer.start();
-    while (timer.elapsed() < 3'000) {
-        if (findOutput(outputs(), outputName)) return;
-        QThread::msleep(100);
-    }
-    throw std::runtime_error("Hyprland accepted the headless-output request, but '"
-                             + outputName + "' did not appear within 3 seconds");
-}
 
-DisplayOutput HyprlandOutputController::configure(const std::string& outputName,
-                                                  const DisplayLayout& layout) const {
+    // Install the exact-name rule before hot-plugging the headless output. This
+    // lets Hyprland select the custom mode during its initial output commit,
+    // rather than briefly committing the backend's default 1920x1080 mode.
     const auto expression = hyprlandMonitorExpression(outputName, layout);
-    auto result = hyprctl({QStringLiteral("eval"), QString::fromStdString(expression)});
-    if (!result.success) {
-        debug("Hyprland Lua monitor command failed; trying the pre-0.55 keyword syntax: "
-              + result.output);
+    const auto luaResult = hyprctl({QStringLiteral("eval"),
+                                    QString::fromStdString(expression)});
+    debug("Hyprland Lua monitor-rule response: "
+          + (luaResult.output.empty() ? std::string("<empty>") : luaResult.output));
+
+    CommandResult ruleResult = luaResult;
+    std::string ruleMethod = "Lua hl.monitor";
+    if (!hyprlandCommandResponseAccepted(luaResult.success, luaResult.output)) {
         const auto& geometry = layout.logicalGeometry;
         const QString legacy = QStringLiteral("%1,%2x%3@%4,%5x%6,%7")
             .arg(QString::fromStdString(outputName))
@@ -190,16 +193,26 @@ DisplayOutput HyprlandOutputController::configure(const std::string& outputName,
             .arg(geometry.x)
             .arg(geometry.y)
             .arg(QString::fromStdString(scaleText(layout.scale)));
-        result = hyprctl({QStringLiteral("keyword"), QStringLiteral("monitor"), legacy});
+        ruleResult = hyprctl({QStringLiteral("keyword"), QStringLiteral("monitor"), legacy});
+        ruleMethod = "legacy keyword monitor";
+        debug("Hyprland legacy monitor-rule response: "
+              + (ruleResult.output.empty() ? std::string("<empty>") : ruleResult.output));
     }
-    if (!result.success) {
-        throw std::runtime_error("Hyprland rejected virtual monitor mode "
-                                 + std::to_string(layout.resolution.width) + 'x'
-                                 + std::to_string(layout.resolution.height) + '@'
-                                 + std::to_string(layout.refreshRate) + " scale "
-                                 + scaleText(layout.scale) + ": " + result.output);
+    if (!hyprlandCommandResponseAccepted(ruleResult.success, ruleResult.output)) {
+        const auto version = hyprctl({QStringLiteral("version")});
+        throw std::runtime_error(
+            "Hyprland could not install the virtual-monitor rule. Lua response: '"
+            + luaResult.output + "'; legacy response: '" + ruleResult.output
+            + "'; version: " + version.output);
     }
 
+    const auto result = hyprctl({QStringLiteral("output"), QStringLiteral("create"),
+                                 QStringLiteral("headless"),
+                                 QString::fromStdString(outputName)});
+    if (!hyprlandCommandResponseAccepted(result.success, result.output)) {
+        throw std::runtime_error("Hyprland could not create headless output '" + outputName
+                                 + "': " + result.output);
+    }
     QElapsedTimer timer;
     timer.start();
     std::vector<DisplayOutput> current;
@@ -211,13 +224,21 @@ DisplayOutput HyprlandOutputController::configure(const std::string& outputName,
             && output->logicalGeometry.x == layout.logicalGeometry.x
             && output->logicalGeometry.y == layout.logicalGeometry.y
             && std::abs(output->scale - layout.scale) < 0.01) {
+            debug("Hyprland applied the virtual-monitor rule through " + ruleMethod);
             return *output;
         }
         QThread::msleep(100);
     }
-    throw std::runtime_error("Hyprland accepted the virtual-monitor command but did not apply "
-                             "the requested mode; last monitor snapshot: "
-                             + outputSnapshot(current));
+    throw std::runtime_error(
+        "Hyprland created '" + outputName + "' but did not apply the requested "
+        + std::to_string(layout.resolution.width) + 'x'
+        + std::to_string(layout.resolution.height) + '@'
+        + std::to_string(layout.refreshRate) + " mode, position "
+        + std::to_string(layout.logicalGeometry.x) + 'x'
+        + std::to_string(layout.logicalGeometry.y) + ", scale "
+        + scaleText(layout.scale) + " via " + ruleMethod
+        + "; last monitor snapshot: " + outputSnapshot(current)
+        + ". Inspect `hyprctl rollinglog` for a rejected custom headless mode.");
 }
 
 void HyprlandOutputController::remove(const std::string& outputName) const {

@@ -9,15 +9,15 @@
 namespace od {
 
 std::vector<DisplayOutput> parseHyprlandOutputs(std::string_view json);
+bool hyprlandCommandResponseAccepted(bool processSucceeded, std::string_view output);
 std::string hyprlandMonitorExpression(const std::string& outputName,
                                       const DisplayLayout& layout);
 
 class HyprlandOutputController {
 public:
     std::vector<DisplayOutput> outputs() const;
-    void create(const std::string& outputName) const;
-    DisplayOutput configure(const std::string& outputName,
-                            const DisplayLayout& layout) const;
+    DisplayOutput create(const std::string& outputName,
+                         const DisplayLayout& layout) const;
     void remove(const std::string& outputName) const;
 };
 

@@ -58,8 +58,7 @@ PortalCapture HyprlandPortal::start(const DesktopRequest& request) {
             virtualOutputName_ = "OpenDisplay-"
                 + std::to_string(QCoreApplication::applicationPid());
             outputCreated_ = true;
-            outputs_.create(virtualOutputName_);
-            const auto configured = outputs_.configure(virtualOutputName_, layout);
+            const auto configured = outputs_.create(virtualOutputName_, layout);
             inputOutputName = configured.name;
             captureWidth = layout.resolution.width;
             captureHeight = layout.resolution.height;
