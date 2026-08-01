@@ -25,7 +25,7 @@ void parsesHyprctlMonitorJson() {
     const std::string json = R"([{
         "id": 1, "name": "eDP-1", "width": 2560, "height": 1600,
         "x": -1707, "y": 0, "scale": 1.5, "transform": 0,
-        "physicalWidth": 380, "physicalHeight": 240,
+        "physicalWidth": 380, "physicalHeight": 240, "focused": true,
         "disabled": false,
         "availableModes": ["2560x1600@60.00100Hz", "1920x1200@60.00000Hz"]
     }])";
@@ -36,6 +36,7 @@ void parsesHyprctlMonitorJson() {
     assert(outputs.front().logicalGeometry.width == 1707);
     assert(outputs.front().physicalSize.has_value());
     assert(outputs.front().physicalSize->widthMm == 380);
+    assert(outputs.front().focused);
     assert(outputs.front().modes.size() == 2);
     assert(std::abs(outputs.front().modes.front().refreshRate - 60.001) < 0.001);
 }
@@ -59,6 +60,11 @@ void rejectsSemanticHyprctlErrorsWithZeroExitStatus() {
     assert(!od::hyprlandCommandResponseAccepted(false, "ok"));
 }
 
+void producesCurrentHyprlandFocusExpression() {
+    assert(od::hyprlandFocusExpression("eDP-1")
+           == "hl.dispatch(hl.dsp.focus({ monitor = \"eDP-1\" }))");
+}
+
 }  // namespace
 
 int main() {
@@ -66,4 +72,5 @@ int main() {
     parsesHyprctlMonitorJson();
     producesCurrentHyprlandMonitorExpression();
     rejectsSemanticHyprctlErrorsWithZeroExitStatus();
+    producesCurrentHyprlandFocusExpression();
 }

@@ -21,6 +21,7 @@ struct DisplayOutput {
     std::string name;
     bool connected = false;
     bool enabled = false;
+    bool focused = false;
     Size resolution;
     Rect logicalGeometry;
     double scale = 1.0;

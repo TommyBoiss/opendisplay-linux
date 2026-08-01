@@ -132,7 +132,9 @@ monitor in the share picker. Touch input uses Hyprland's
 `zwlr_virtual_pointer_manager_v1` support and does not require the unsupported
 RemoteDesktop portal. Current Hyprland Lua monitor rules are used first, with
 the pre-0.55 `keyword monitor` command as a compatibility fallback. The
-headless output is removed when the session stops.
+headless output is removed when the session stops. Before XDPH opens its share
+picker, OpenDisplay restores focus and cursor placement to the selected
+reference monitor so the authorization prompt remains reachable.
 
 If Bonjour discovery is unavailable, confirm that the phone app is open and
 inspect the advertised service with `avahi-browse -rt _opensidecar._tcp`.

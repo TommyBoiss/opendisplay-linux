@@ -78,6 +78,14 @@ PortalCapture HyprlandPortal::start(const DesktopRequest& request) {
             captureLogicalHeight = reference.logicalGeometry.height;
         }
 
+        // Hot-plugging a headless output can make it Hyprland's active monitor.
+        // Restore both monitor focus and cursor placement before XDPH creates
+        // its chooser, otherwise the authorization UI can appear on the output
+        // that is not capturable until the chooser is accepted.
+        outputs_.focus(reference.name);
+        log("Reference monitor focused; opening the share chooser on " + reference.name
+            + "…");
+
         const auto availableSources = portal_.property(screenCastInterface,
                                                        "AvailableSourceTypes");
         if (availableSources.isValid() && (availableSources.toUInt() & 1U) == 0) {
@@ -98,6 +106,9 @@ PortalCapture HyprlandPortal::start(const DesktopRequest& request) {
         portal_.request(screenCastInterface, QStringLiteral("SelectSources"),
                         {QVariant::fromValue(QDBusObjectPath(sessionPath_))},
                         std::move(sourceOptions));
+        // XDPH normally launches its picker from Start. Reassert focus here in
+        // case creating the portal session changed the active surface.
+        outputs_.focus(reference.name);
         const auto started = portal_.request(
             screenCastInterface, QStringLiteral("Start"),
             {QVariant::fromValue(QDBusObjectPath(sessionPath_)), QString()}, {});

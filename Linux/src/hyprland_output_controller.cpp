@@ -110,6 +110,7 @@ std::vector<DisplayOutput> parseHyprlandOutputs(const std::string_view json) {
         output.connected = !output.name.empty();
         output.enabled = !native.value(QStringLiteral("disabled")).toBool()
             && output.resolution.width > 0 && output.resolution.height > 0;
+        output.focused = native.value(QStringLiteral("focused")).toBool();
         output.scale = native.value(QStringLiteral("scale")).toDouble(1.0);
         if (output.scale <= 0) output.scale = 1.0;
         const double physicalWidth = native.value(QStringLiteral("physicalWidth")).toDouble();
@@ -154,6 +155,10 @@ std::string hyprlandMonitorExpression(const std::string& outputName,
                << layout.refreshRate << "\", position = \"" << geometry.x << 'x'
                << geometry.y << "\", scale = " << scaleText(layout.scale) << " })";
     return expression.str();
+}
+
+std::string hyprlandFocusExpression(const std::string& outputName) {
+    return "hl.dispatch(hl.dsp.focus({ monitor = \"" + outputName + "\" }))";
 }
 
 std::vector<DisplayOutput> HyprlandOutputController::outputs() const {
@@ -239,6 +244,49 @@ DisplayOutput HyprlandOutputController::create(const std::string& outputName,
         + scaleText(layout.scale) + " via " + ruleMethod
         + "; last monitor snapshot: " + outputSnapshot(current)
         + ". Inspect `hyprctl rollinglog` for a rejected custom headless mode.");
+}
+
+void HyprlandOutputController::focus(const std::string& outputName) const {
+    const auto luaResult = hyprctl({
+        QStringLiteral("eval"),
+        QString::fromStdString(hyprlandFocusExpression(outputName)),
+    });
+    debug("Hyprland Lua focus response: "
+          + (luaResult.output.empty() ? std::string("<empty>") : luaResult.output));
+
+    CommandResult focusResult = luaResult;
+    std::string focusMethod = "Lua hl.dsp.focus";
+    if (!hyprlandCommandResponseAccepted(luaResult.success, luaResult.output)) {
+        focusResult = hyprctl({QStringLiteral("dispatch"),
+                               QStringLiteral("focusmonitor"),
+                               QString::fromStdString(outputName)});
+        focusMethod = "legacy focusmonitor";
+        debug("Hyprland legacy focus response: "
+              + (focusResult.output.empty() ? std::string("<empty>")
+                                            : focusResult.output));
+    }
+    if (!hyprlandCommandResponseAccepted(focusResult.success, focusResult.output)) {
+        throw std::runtime_error(
+            "Hyprland could not focus reference monitor '" + outputName
+            + "' before opening the share chooser. Lua response: '" + luaResult.output
+            + "'; legacy response: '" + focusResult.output + "'");
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 2'000) {
+        const auto current = outputs();
+        const auto output = findOutput(current, outputName);
+        if (output && output->focused) {
+            debug("Focused reference monitor " + outputName + " through " + focusMethod);
+            return;
+        }
+        QThread::msleep(50);
+    }
+    throw std::runtime_error(
+        "Hyprland accepted the focus request for reference monitor '" + outputName
+        + "' but still reports another monitor as focused; refusing to open an inaccessible "
+          "share chooser");
 }
 
 void HyprlandOutputController::remove(const std::string& outputName) const {
