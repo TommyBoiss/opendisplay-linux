@@ -112,11 +112,11 @@ display ([#72](https://github.com/peetzweg/opendisplay/issues/72)).
 
 ## Quick start (from source)
 
-### Linux CLI MVP (KDE Wayland)
+### Linux CLI MVP (KDE and Hyprland Wayland)
 
 An experimental Linux sender is available under [`Linux/`](Linux/README.md).
 It uses the existing iOS app unchanged and supports Wi-Fi, usbmuxd USB,
-PipeWire capture, portal-based virtual outputs/input, and FFmpeg H.264 encoding.
+PipeWire capture, compositor-managed virtual outputs/input, and FFmpeg H.264 encoding.
 
 ### macOS and iOS prerequisites
 

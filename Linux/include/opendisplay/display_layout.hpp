@@ -38,6 +38,11 @@ struct DisplayLayout {
     bool adjustedResolution = false;
 };
 
+enum class DisplayModePolicy {
+    KdeCvt,
+    IntegerLogicalSize,
+};
+
 /// KScreen numeric ids are snapshot-local and can change when an output is
 /// inserted. Connector names are the stable identity within a compositor
 /// session; the id is only a fallback for incomplete backend data.
@@ -49,6 +54,7 @@ DisplayOutput selectReferenceOutput(const std::vector<DisplayOutput>& outputs,
 DisplayLayout planDisplayLayout(const DisplayOutput& detectedReference,
                                 const PhoneInfo& receiver,
                                 const DisplayOptions& options,
-                                int defaultRefreshRate);
+                                int defaultRefreshRate,
+                                DisplayModePolicy modePolicy = DisplayModePolicy::KdeCvt);
 
 }  // namespace od

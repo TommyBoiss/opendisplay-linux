@@ -1,16 +1,18 @@
 pkgname=opendisplay-linux-git
 pkgver=1.14.0.r0.g0173617
-pkgrel=2
-pkgdesc="Use an iOS device as a KDE Wayland display"
+pkgrel=3
+pkgdesc="Use an iOS device as a KDE or Hyprland Wayland display"
 arch=('x86_64')
 url="https://github.com/tixwho/opendisplay"
 license=('GPL-3.0-only')
 depends=('qt6-base' 'qt6-wayland' 'pipewire' 'avahi' 'libusbmuxd' 'usbmuxd' 'ffmpeg'
-         'libkscreen>=6.6' 'xdg-desktop-portal' 'xdg-desktop-portal-kde')
+         'libkscreen>=6.6' 'wayland' 'xdg-desktop-portal' 'xdg-desktop-portal-kde')
 makedepends=('cmake' 'git')
 optdepends=('libva-mesa-driver: VA-API support for AMD GPUs'
             'intel-media-driver: VA-API support for modern Intel GPUs'
-            'nvidia-utils: NVENC support for NVIDIA GPUs')
+            'nvidia-utils: NVENC support for NVIDIA GPUs'
+            'hyprland: Hyprland compositor backend'
+            'xdg-desktop-portal-hyprland: Hyprland screen-cast portal')
 provides=('opendisplay-linux')
 conflicts=('opendisplay-linux')
 _giturl="https://gitea.camphorwood.tixwho.com/tixwho/opendisplay.git"

@@ -19,7 +19,8 @@ int nearestMultiple(const int value, const int multiple) {
     return value - lower <= upper - value ? lower : upper;
 }
 
-Size compatibleResolution(const Size requested, const double scale) {
+Size compatibleResolution(const Size requested, const double scale,
+                          const DisplayModePolicy policy) {
     // Plasma exposes scale in 0.05 increments. Expressing the scale as a
     // reduced p/20 fraction lets us choose pixel dimensions whose logical
     // dimensions (pixels / scale) are exact integers. KWin generates custom
@@ -28,8 +29,10 @@ Size compatibleResolution(const Size requested, const double scale) {
     const int twentieths = std::max(1, static_cast<int>(std::lround(scale * 20.0)));
     const int divisor = std::gcd(twentieths, 20);
     const int numerator = twentieths / divisor;
+    const int horizontalMultiple = policy == DisplayModePolicy::KdeCvt ? 8 : 2;
     return {
-        .width = nearestMultiple(std::max(8, requested.width), std::lcm(numerator, 8)),
+        .width = nearestMultiple(std::max(horizontalMultiple, requested.width),
+                                 std::lcm(numerator, horizontalMultiple)),
         .height = nearestMultiple(std::max(2, requested.height), std::lcm(numerator, 2)),
     };
 }
@@ -110,7 +113,7 @@ DisplayOutput selectReferenceOutput(const std::vector<DisplayOutput>& outputs,
     std::copy_if(outputs.begin(), outputs.end(), std::back_inserter(active),
                  [](const auto& output) { return output.connected && output.enabled; });
     if (active.empty()) {
-        throw std::runtime_error("KDE reports no enabled monitor to use as a reference");
+        throw std::runtime_error("the compositor reports no enabled monitor to use as a reference");
     }
     if (requested.empty()) {
         if (active.size() != 1) {
@@ -134,7 +137,8 @@ DisplayOutput selectReferenceOutput(const std::vector<DisplayOutput>& outputs,
 DisplayLayout planDisplayLayout(const DisplayOutput& detectedReference,
                                 const PhoneInfo& receiver,
                                 const DisplayOptions& options,
-                                const int defaultRefreshRate) {
+                                const int defaultRefreshRate,
+                                const DisplayModePolicy modePolicy) {
     validateAlignment(options.extendTo, options.alignTo);
     DisplayOutput reference = detectedReference;
     if (options.referenceResolution) reference.resolution = *options.referenceResolution;
@@ -176,7 +180,7 @@ DisplayLayout planDisplayLayout(const DisplayOutput& detectedReference,
     scale = quantizedScale(scale);
 
     const Size requestedResolution = options.virtualResolution.value_or(receiverPixels);
-    const Size resolution = compatibleResolution(requestedResolution, scale);
+    const Size resolution = compatibleResolution(requestedResolution, scale, modePolicy);
     const int logicalWidth = static_cast<int>(std::lround(resolution.width / scale));
     const int logicalHeight = static_cast<int>(std::lround(resolution.height / scale));
     const auto& ref = reference.logicalGeometry;

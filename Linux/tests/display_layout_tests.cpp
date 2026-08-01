@@ -83,6 +83,18 @@ void makesKdeCustomModesCvtCompatible() {
     assert(layout.resolution.height == 1668);
 }
 
+void keepsHyprlandNativeModeWhenLogicalSizeIsIntegral() {
+    od::DisplayOptions options;
+    options.virtualResolution = od::Size{.width = 2420, .height = 1668};
+    options.virtualScale = 2.0;
+    const auto layout = od::planDisplayLayout(
+        monitor("1", "eDP-1"), ipad(), options, 60,
+        od::DisplayModePolicy::IntegerLogicalSize);
+    assert(layout.resolution.width == 2420);
+    assert(layout.resolution.height == 1668);
+    assert(!layout.adjustedResolution);
+}
+
 void supportsEveryPlacementAxis() {
     od::DisplayOptions options;
     options.virtualResolution = od::Size{.width = 1000, .height = 800};
@@ -123,6 +135,7 @@ int main() {
     defaultsToBottomRight();
     makesFractionalModesLogicallyIntegral();
     makesKdeCustomModesCvtCompatible();
+    keepsHyprlandNativeModeWhenLogicalSizeIsIntegral();
     supportsEveryPlacementAxis();
     derivesScaleFromPhysicalDensity();
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(opendisplay-linux VERSION 0.1.0 LANGUAGES CXX)
+project(opendisplay-linux VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,23 +15,50 @@ find_package(Threads REQUIRED)
 pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
 pkg_check_modules(AVAHI REQUIRED IMPORTED_TARGET avahi-client)
 pkg_check_modules(USBMUXD REQUIRED IMPORTED_TARGET libusbmuxd-2.0)
+pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
+find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+
+set(VIRTUAL_POINTER_XML
+    ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-virtual-pointer-unstable-v1.xml)
+set(PROTOCOL_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+set(VIRTUAL_POINTER_HEADER
+    ${PROTOCOL_OUTPUT_DIR}/wlr-virtual-pointer-unstable-v1-client-protocol.h)
+set(VIRTUAL_POINTER_CODE
+    ${PROTOCOL_OUTPUT_DIR}/wlr-virtual-pointer-unstable-v1-protocol.c)
+add_custom_command(
+    OUTPUT ${VIRTUAL_POINTER_HEADER} ${VIRTUAL_POINTER_CODE}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PROTOCOL_OUTPUT_DIR}
+    COMMAND ${WAYLAND_SCANNER} client-header ${VIRTUAL_POINTER_XML} ${VIRTUAL_POINTER_HEADER}
+    COMMAND ${WAYLAND_SCANNER} private-code ${VIRTUAL_POINTER_XML} ${VIRTUAL_POINTER_CODE}
+    DEPENDS ${VIRTUAL_POINTER_XML}
+    VERBATIM
+)
 
 add_executable(opendisplay-linux
     include/opendisplay/kde_portal.hpp
+    include/opendisplay/hyprland_portal.hpp
+    include/opendisplay/xdg_portal.hpp
+    ${VIRTUAL_POINTER_HEADER}
+    ${VIRTUAL_POINTER_CODE}
     src/main.cpp
+    src/desktop_backend_factory.cpp
     src/display_layout.cpp
     src/discovery.cpp
     src/ffmpeg_encoder.cpp
     src/kde_output_controller.cpp
     src/kde_portal.cpp
+    src/hyprland_output_controller.cpp
+    src/hyprland_portal.cpp
     src/pipewire_capture.cpp
     src/pipewire_format.cpp
     src/session.cpp
     src/socket.cpp
     src/wire.cpp
+    src/wayland_virtual_pointer.cpp
+    src/xdg_portal.cpp
 )
 
-target_include_directories(opendisplay-linux PRIVATE include)
+target_include_directories(opendisplay-linux PRIVATE include ${PROTOCOL_OUTPUT_DIR})
 target_link_libraries(opendisplay-linux PRIVATE
     Qt6::Core
     Qt6::DBus
@@ -40,6 +67,7 @@ target_link_libraries(opendisplay-linux PRIVATE
     PkgConfig::PIPEWIRE
     PkgConfig::AVAHI
     PkgConfig::USBMUXD
+    PkgConfig::WAYLAND
     Threads::Threads
 )
 
@@ -65,6 +93,18 @@ if(BUILD_TESTING)
     target_include_directories(opendisplay-display-layout-tests PRIVATE include)
     target_compile_options(opendisplay-display-layout-tests PRIVATE -UNDEBUG)
     add_test(NAME display-layout COMMAND opendisplay-display-layout-tests)
+
+    add_executable(opendisplay-desktop-backend-tests
+        tests/desktop_backend_tests.cpp
+        src/desktop_backend_factory.cpp
+        src/hyprland_output_controller.cpp
+    )
+    target_include_directories(opendisplay-desktop-backend-tests PRIVATE include)
+    target_link_libraries(opendisplay-desktop-backend-tests PRIVATE Qt6::Core)
+    target_compile_definitions(opendisplay-desktop-backend-tests PRIVATE
+        OD_DESKTOP_FACTORY_TEST_ONLY=1)
+    target_compile_options(opendisplay-desktop-backend-tests PRIVATE -UNDEBUG)
+    add_test(NAME desktop-backend COMMAND opendisplay-desktop-backend-tests)
 
     add_executable(opendisplay-wire-tests
         tests/wire_tests.cpp

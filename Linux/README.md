@@ -1,18 +1,20 @@
 # OpenDisplay Linux CLI MVP
 
-This target connects the existing, unmodified iOS/iPadOS receiver to a KDE
-Wayland session. It discovers `_opensidecar._tcp` services with Avahi or opens
-the receiver's port through usbmuxd, creates a virtual output through the KDE
-RemoteDesktop/ScreenCast portal, captures it with PipeWire, and streams Annex B
-H.264 produced by FFmpeg. There is no desktop GUI.
+This target connects the existing, unmodified iOS/iPadOS receiver to a KDE or
+Hyprland Wayland session. It discovers `_opensidecar._tcp` services with Avahi
+or opens the receiver's port through usbmuxd, captures with PipeWire, and
+streams Annex B H.264 produced by FFmpeg. There is no desktop GUI.
 
 ## Arch Linux dependencies
 
 ```sh
 sudo pacman -S --needed base-devel cmake qt6-base qt6-wayland pipewire avahi \
-  libusbmuxd usbmuxd ffmpeg libkscreen \
+  libusbmuxd usbmuxd ffmpeg libkscreen wayland \
   xdg-desktop-portal xdg-desktop-portal-kde
 ```
+
+For Hyprland, also install `hyprland xdg-desktop-portal-hyprland`. The package
+keeps the KDE dependencies so one binary can select either backend.
 
 For hardware encoding, install the driver for the GPU: `libva-mesa-driver` for AMD,
 `intel-media-driver` for modern Intel GPUs, or `nvidia-utils` for NVIDIA.
@@ -72,8 +74,9 @@ Open the existing OpenDisplay app on the iOS device, then run:
 ./build/linux/opendisplay-linux --transport auto --mode extend
 ```
 
-The first run displays KDE portal dialogs for output capture and pointer
-control. Other useful forms are:
+The compositor backend is detected automatically; override it with
+`--compositor kde` or `--compositor hyprland`. The first run displays the
+desktop's capture permission dialog. Other useful forms are:
 
 ```sh
 ./build/linux/opendisplay-linux --list
@@ -81,13 +84,14 @@ control. Other useful forms are:
 ./build/linux/opendisplay-linux --transport wifi --host 192.168.1.40
 ./build/linux/opendisplay-linux --encoder vaapi --vaapi-device /dev/dri/renderD128
 ./build/linux/opendisplay-linux --encoder nvenc --mode mirror --no-input
+./build/linux/opendisplay-linux --compositor hyprland --reference-monitor eDP-1
 ```
 
 ### Virtual monitor layout
 
-In extend mode, OpenDisplay queries libkscreen before opening the KDE portal.
-One enabled monitor is selected automatically; with two or more, pass its
-connector name or current KScreen session id explicitly:
+In extend mode, OpenDisplay queries the selected compositor before opening its
+portal. One enabled monitor is selected automatically; with two or more, pass
+its connector name or current backend id explicitly:
 
 ```sh
 opendisplay-linux --reference-monitor DP-1
@@ -97,14 +101,15 @@ opendisplay-linux --extend-to bottom --align-to right
 
 The default is bottom-right: extend right and align bottom. Left/right extension
 accepts `top`, `bottom`, or `center` alignment; top/bottom extension accepts
-`left`, `right`, or `center`. Positions use KDE logical coordinates.
+`left`, `right`, or `center`. Positions use compositor logical coordinates.
 
 The automatic mode starts with the iPad's native pixels. It uses physical DPI
 when both panel sizes are available, otherwise the iOS-reported native scale;
 the result is rounded to a 0.05 scale step. Pixel dimensions are nudged to the
 nearest values that produce integer logical dimensions; widths are also made
-divisible by eight for KDE's CVT-generated custom modes. Detection and any part
-of the calculation can be overridden:
+divisible by eight for KDE's CVT-generated custom modes. Hyprland keeps native
+pixel dimensions when they already produce an integer logical size. Detection
+and any part of the calculation can be overridden:
 
 ```sh
 opendisplay-linux --virtual-resolution 2420x1668 --display-scale 1.25
@@ -115,9 +120,19 @@ opendisplay-linux --reference-geometry 2560x1440+0+0
 ```
 
 `--scale` remains the video encoder resolution multiplier and does not change
-KDE display scaling. Custom virtual modes require Plasma/libkscreen 6.6 or
-newer. OpenDisplay uses libkscreen in-process so output identity and detailed
-configuration errors remain reliable while KDE adds or renumbers outputs.
+desktop display scaling. KDE custom virtual modes require Plasma/libkscreen
+6.6 or newer. OpenDisplay uses libkscreen in-process so output identity and
+detailed configuration errors remain reliable while KDE adds or renumbers
+outputs.
+
+On Hyprland, OpenDisplay creates a named headless output with `hyprctl`, applies
+the same resolution, scaling, and placement calculation, and asks the
+ScreenCast portal to capture a monitor. Select the displayed `OpenDisplay-PID`
+monitor in the share picker. Touch input uses Hyprland's
+`zwlr_virtual_pointer_manager_v1` support and does not require the unsupported
+RemoteDesktop portal. Current Hyprland Lua monitor rules are used first, with
+the pre-0.55 `keyword monitor` command as a compatibility fallback. The
+headless output is removed when the session stops.
 
 If Bonjour discovery is unavailable, confirm that the phone app is open and
 inspect the advertised service with `avahi-browse -rt _opensidecar._tcp`.
@@ -133,11 +148,11 @@ device; it does not decode video or advertise Bonjour.
 
 ## Current MVP limits
 
-KDE Plasma Wayland is the only supported desktop. Portal support determines
-whether true virtual-output extension is available; `--mode mirror` is the
-fallback on systems whose portal cannot create a virtual source. Audio,
+KDE Plasma Wayland and Hyprland are supported. Hyprland's portal picker cannot
+yet be preselected by output name, so the requested monitor must be chosen in
+the dialog. Audio,
 clipboard, cursor sprites, encryption, reconnection, and multi-device sessions
 remain out of scope. Compositor-neutral layout lives in `display_layout`, while
-KScreen operations are isolated in `KdeOutputController` and portal capture in
-`KdePortal`. Later wlroots controllers need not change transport, protocol,
+KScreen and Hyprland output operations remain isolated in their respective
+controllers. Later compositor backends need not change transport, protocol,
 layout planning, or encoding code.

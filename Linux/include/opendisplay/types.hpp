@@ -9,6 +9,7 @@ namespace od {
 enum class TransportKind { Auto, Wifi, Usb };
 enum class CaptureMode { Extend, Mirror };
 enum class EncoderKind { Auto, Vaapi, Nvenc, Software };
+enum class CompositorKind { Auto, Kde, Hyprland };
 enum class ExtendDirection { Left, Right, Top, Bottom };
 enum class AlignDirection { Left, Right, Top, Bottom, Center };
 
@@ -88,6 +89,7 @@ struct Options {
     TransportKind transport = TransportKind::Auto;
     CaptureMode mode = CaptureMode::Extend;
     EncoderKind encoder = EncoderKind::Auto;
+    CompositorKind compositor = CompositorKind::Auto;
     std::string host;
     std::uint16_t port = 9000;
     std::string serviceName;

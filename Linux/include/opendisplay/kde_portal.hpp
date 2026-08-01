@@ -2,9 +2,8 @@
 
 #include "opendisplay/desktop_backend.hpp"
 #include "opendisplay/kde_output_controller.hpp"
+#include "opendisplay/xdg_portal.hpp"
 
-#include <QDBusConnection>
-#include <QVariantMap>
 #include <QObject>
 
 #include <optional>
@@ -29,26 +28,14 @@ public:
     void pointer(std::string_view phase, double normalizedX, double normalizedY) override;
     void scroll(double dx, double dy) override;
 
-private slots:
-    void requestResponse(uint response, const QVariantMap& results);
-
 private:
-    QVariantMap request(const QString& interface, const QString& method,
-                        const QVariantList& arguments, QVariantMap options);
-    static QVariant unwrap(QVariant value);
-    static std::optional<PortalStream> firstStream(const QVariant& value,
-                                                   int fallbackWidth,
-                                                   int fallbackHeight);
     void notify(const QString& method, const QVariantList& arguments);
 
-    QDBusConnection bus_;
+    XdgPortal portal_;
     QString sessionPath_;
     PortalStream stream_;
     bool inputEnabled_ = false;
     bool pointerDown_ = false;
-    bool waiting_ = false;
-    uint responseCode_ = 2;
-    QVariantMap responseResults_;
     KdeOutputController outputs_;
     std::optional<DisplayOutput> virtualOutput_;
     std::vector<DisplayOutput> outputsBefore_;

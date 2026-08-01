@@ -1,5 +1,5 @@
 #include "opendisplay/discovery.hpp"
-#include "opendisplay/kde_portal.hpp"
+#include "opendisplay/desktop_backend_factory.hpp"
 #include "opendisplay/log.hpp"
 #include "opendisplay/session.hpp"
 #include "opendisplay/types.hpp"
@@ -44,6 +44,13 @@ od::EncoderKind encoder(const QString& value) {
     if (value == QStringLiteral("nvenc")) return od::EncoderKind::Nvenc;
     if (value == QStringLiteral("software")) return od::EncoderKind::Software;
     throw std::runtime_error("--encoder must be auto, vaapi, nvenc, or software");
+}
+
+od::CompositorKind compositor(const QString& value) {
+    if (value == QStringLiteral("auto")) return od::CompositorKind::Auto;
+    if (value == QStringLiteral("kde")) return od::CompositorKind::Kde;
+    if (value == QStringLiteral("hyprland")) return od::CompositorKind::Hyprland;
+    throw std::runtime_error("--compositor must be auto, kde, or hyprland");
 }
 
 od::ExtendDirection extendDirection(const QString& value) {
@@ -147,7 +154,7 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral(
-        "Use an unchanged OpenDisplay iOS app as a KDE Wayland display."));
+        "Use an unchanged OpenDisplay iOS app as a Wayland display."));
     parser.addHelpOption();
     parser.addVersionOption();
 
@@ -161,6 +168,8 @@ int main(int argc, char* argv[]) {
                                         "mode", "extend");
     const QCommandLineOption encoderOption({"e", "encoder"},
         "FFmpeg encoder: auto, vaapi, nvenc, or software.", "encoder", "auto");
+    const QCommandLineOption compositorOption("compositor",
+        "Desktop backend: auto, kde, or hyprland.", "name", "auto");
     const QCommandLineOption vaapiOption("vaapi-device", "VA-API render node.", "path",
                                          "/dev/dri/renderD128");
     const QCommandLineOption fpsOption("fps", "Maximum frame rate.", "fps", "60");
@@ -169,7 +178,7 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption scaleOption("scale", "Encoded resolution multiplier.", "factor",
                                           "1.0");
     const QCommandLineOption referenceOption("reference-monitor",
-        "Reference monitor name or KScreen id (required when multiple are enabled).", "output");
+        "Reference monitor name or backend id (required when multiple are enabled).", "output");
     const QCommandLineOption extendOption("extend-to",
         "Place the virtual monitor on this side: left, right, top, or bottom.",
         "side", "right");
@@ -178,7 +187,7 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption virtualResolutionOption("virtual-resolution",
         "Override the receiver-native virtual mode.", "WIDTHxHEIGHT");
     const QCommandLineOption displayScaleOption({"display-scale", "virtual-scale"},
-        "Override the auto-selected KDE output scale.", "factor");
+        "Override the auto-selected virtual output scale.", "factor");
     const QCommandLineOption virtualRefreshOption("virtual-refresh",
         "Override virtual-output refresh (defaults to --fps).", "hz");
     const QCommandLineOption referenceGeometryOption("reference-geometry",
@@ -195,7 +204,7 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption listOption({"l", "list"}, "List visible Wi-Fi and USB receivers.");
     const QCommandLineOption verboseOption("verbose", "Enable diagnostic logging.");
     parser.addOptions({transportOption, hostOption, portOption, serviceOption, udidOption,
-                       modeOption, encoderOption, vaapiOption, fpsOption, bitrateOption,
+                       modeOption, encoderOption, compositorOption, vaapiOption, fpsOption, bitrateOption,
                        scaleOption, referenceOption, extendOption, alignOption,
                        virtualResolutionOption, displayScaleOption, virtualRefreshOption,
                        referenceGeometryOption, referenceResolutionOption,
@@ -208,6 +217,7 @@ int main(int argc, char* argv[]) {
         options.transport = transport(parser.value(transportOption));
         options.mode = mode(parser.value(modeOption));
         options.encoder = encoder(parser.value(encoderOption));
+        options.compositor = compositor(parser.value(compositorOption));
         options.host = parser.value(hostOption).toStdString();
         const int port = positiveInt(parser, portOption);
         if (port > 65'535) {
@@ -288,7 +298,7 @@ int main(int argc, char* argv[]) {
         }
 
         const auto endpoint = od::chooseEndpoint(options);
-        od::Session session(options, std::make_unique<od::KdePortal>());
+        od::Session session(options, od::makeDesktopBackend(options.compositor));
         session.start(endpoint);
         std::signal(SIGINT, handleSignal);
         std::signal(SIGTERM, handleSignal);
