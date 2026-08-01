@@ -5,8 +5,8 @@ pkgdesc="Use an iOS device as a KDE Wayland display"
 arch=('x86_64')
 url="https://github.com/tixwho/opendisplay"
 license=('GPL-3.0-only')
-depends=('qt6-base' 'pipewire' 'avahi' 'libusbmuxd' 'usbmuxd' 'ffmpeg'
-         'libkscreen' 'xdg-desktop-portal' 'xdg-desktop-portal-kde')
+depends=('qt6-base' 'qt6-wayland' 'pipewire' 'avahi' 'libusbmuxd' 'usbmuxd' 'ffmpeg'
+         'libkscreen>=6.6' 'xdg-desktop-portal' 'xdg-desktop-portal-kde')
 makedepends=('cmake' 'git')
 optdepends=('libva-mesa-driver: VA-API support for AMD GPUs'
             'intel-media-driver: VA-API support for modern Intel GPUs'

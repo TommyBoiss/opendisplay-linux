@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core DBus)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core DBus Gui)
+find_package(KF6Screen 6.3 REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -34,6 +35,8 @@ target_include_directories(opendisplay-linux PRIVATE include)
 target_link_libraries(opendisplay-linux PRIVATE
     Qt6::Core
     Qt6::DBus
+    Qt6::Gui
+    KF6::Screen
     PkgConfig::PIPEWIRE
     PkgConfig::AVAHI
     PkgConfig::USBMUXD
@@ -42,6 +45,15 @@ target_link_libraries(opendisplay-linux PRIVATE
 
 target_compile_options(opendisplay-linux PRIVATE
     -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+)
+
+if(KF6Screen_VERSION VERSION_GREATER_EQUAL "6.6")
+    target_compile_definitions(opendisplay-linux PRIVATE OD_KSCREEN_HAS_CUSTOM_MODES=1)
+else()
+    target_compile_definitions(opendisplay-linux PRIVATE OD_KSCREEN_HAS_CUSTOM_MODES=0)
+endif()
+target_compile_definitions(opendisplay-linux PRIVATE
+    OD_KSCREEN_VERSION_STRING="${KF6Screen_VERSION}"
 )
 
 include(CTest)

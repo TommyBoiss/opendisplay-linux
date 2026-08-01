@@ -24,9 +24,6 @@ public:
                               std::chrono::milliseconds timeout) const;
     OutputTranslation apply(const DisplayOutput& output, const DisplayLayout& layout) const;
     void restorePositions(const std::vector<DisplayOutput>& outputs) const;
-
-private:
-    static std::string run(const std::vector<std::string>& arguments);
 };
 
 }  // namespace od

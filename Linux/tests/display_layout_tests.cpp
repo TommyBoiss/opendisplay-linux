@@ -53,10 +53,10 @@ void detectsAddedOutputAcrossKscreenRenumbering() {
 
 void defaultsToBottomRight() {
     const auto layout = od::planDisplayLayout(monitor("1", "eDP-1"), ipad(), {}, 60);
-    assert(layout.resolution.width == 2420);
+    assert(layout.resolution.width == 2416);
     assert(layout.resolution.height == 1668);
     assert(std::abs(layout.scale - 2.0) < 0.001);
-    assert(layout.logicalGeometry.width == 1210);
+    assert(layout.logicalGeometry.width == 1208);
     assert(layout.logicalGeometry.height == 834);
     assert(layout.logicalGeometry.x == 2148);
     assert(layout.logicalGeometry.y == 518);
@@ -66,11 +66,21 @@ void makesFractionalModesLogicallyIntegral() {
     od::DisplayOptions options;
     options.virtualScale = 1.25;
     const auto layout = od::planDisplayLayout(monitor("1", "eDP-1"), ipad(), options, 60);
-    assert(layout.resolution.width == 2420);
+    assert(layout.resolution.width == 2400);
     assert(layout.resolution.height == 1670);
-    assert(layout.logicalGeometry.width == 1936);
+    assert(layout.logicalGeometry.width == 1920);
     assert(layout.logicalGeometry.height == 1336);
     assert(layout.adjustedResolution);
+}
+
+void makesKdeCustomModesCvtCompatible() {
+    od::DisplayOptions options;
+    options.virtualResolution = od::Size{.width = 2420, .height = 1668};
+    options.virtualScale = 1.0;
+    const auto layout = od::planDisplayLayout(monitor("1", "eDP-1"), ipad(), options, 60);
+    assert(layout.resolution.width == 2416);
+    assert(layout.resolution.width % 8 == 0);
+    assert(layout.resolution.height == 1668);
 }
 
 void supportsEveryPlacementAxis() {
@@ -112,6 +122,7 @@ int main() {
     detectsAddedOutputAcrossKscreenRenumbering();
     defaultsToBottomRight();
     makesFractionalModesLogicallyIntegral();
+    makesKdeCustomModesCvtCompatible();
     supportsEveryPlacementAxis();
     derivesScaleFromPhysicalDensity();
 }

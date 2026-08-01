@@ -16,21 +16,21 @@ constexpr double millimetresPerInch = 25.4;
 int nearestMultiple(const int value, const int multiple) {
     const int lower = std::max(multiple, (value / multiple) * multiple);
     const int upper = lower + multiple;
-    return value - lower < upper - value ? lower : upper;
+    return value - lower <= upper - value ? lower : upper;
 }
 
 Size compatibleResolution(const Size requested, const double scale) {
     // Plasma exposes scale in 0.05 increments. Expressing the scale as a
     // reduced p/20 fraction lets us choose pixel dimensions whose logical
-    // dimensions (pixels / scale) are exact integers. Even dimensions are
-    // retained for H.264 encoders.
+    // dimensions (pixels / scale) are exact integers. KWin generates custom
+    // modelines with CVT, which quantizes horizontal active pixels to groups
+    // of eight. The vertical dimension only needs to remain even for H.264.
     const int twentieths = std::max(1, static_cast<int>(std::lround(scale * 20.0)));
     const int divisor = std::gcd(twentieths, 20);
     const int numerator = twentieths / divisor;
-    const int multiple = std::lcm(numerator, 2);
     return {
-        .width = nearestMultiple(std::max(2, requested.width), multiple),
-        .height = nearestMultiple(std::max(2, requested.height), multiple),
+        .width = nearestMultiple(std::max(8, requested.width), std::lcm(numerator, 8)),
+        .height = nearestMultiple(std::max(2, requested.height), std::lcm(numerator, 2)),
     };
 }
 

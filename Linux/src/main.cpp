@@ -6,7 +6,7 @@
 
 #include <QCommandLineOption>
 #include <QCommandLineParser>
-#include <QCoreApplication>
+#include <QGuiApplication>
 #include <QRegularExpression>
 #include <QTimer>
 
@@ -140,7 +140,8 @@ void printEndpoint(const od::Endpoint& endpoint) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    QCoreApplication application(argc, argv);
+    QGuiApplication::setDesktopSettingsAware(false);
+    QGuiApplication application(argc, argv);
     std::signal(SIGPIPE, SIG_IGN);
     QCoreApplication::setApplicationName(QStringLiteral("opendisplay-linux"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));

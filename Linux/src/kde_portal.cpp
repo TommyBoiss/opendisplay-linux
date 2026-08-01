@@ -210,7 +210,8 @@ PortalCapture KdePortal::start(const DesktopRequest& desktopRequest) {
             debug("Virtual scale derived from the receiver native scale");
         }
         if (layout->adjustedResolution) {
-            debug("Adjusted virtual resolution for integer logical geometry: "
+            debug("Adjusted virtual resolution for KDE custom-mode and integer logical "
+                  "geometry: "
                   + std::to_string(layout->resolution.width) + 'x'
                   + std::to_string(layout->resolution.height));
         }
