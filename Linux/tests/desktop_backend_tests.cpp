@@ -24,6 +24,7 @@ void detectsDesktopWithoutChangingLegacyFallback() {
 void parsesHyprctlMonitorJson() {
     const std::string json = R"([{
         "id": 1, "name": "eDP-1", "width": 2560, "height": 1600,
+        "refreshRate": 60.003,
         "x": -1707, "y": 0, "scale": 1.5, "transform": 0,
         "physicalWidth": 380, "physicalHeight": 240, "focused": true,
         "disabled": false,
@@ -34,6 +35,7 @@ void parsesHyprctlMonitorJson() {
     assert(outputs.front().name == "eDP-1");
     assert(outputs.front().logicalGeometry.x == -1707);
     assert(outputs.front().logicalGeometry.width == 1707);
+    assert(std::abs(outputs.front().refreshRate - 60.003) < 0.001);
     assert(outputs.front().physicalSize.has_value());
     assert(outputs.front().physicalSize->widthMm == 380);
     assert(outputs.front().focused);
@@ -50,6 +52,16 @@ void producesCurrentHyprlandMonitorExpression() {
     const auto expression = od::hyprlandMonitorExpression("OpenDisplay-42", layout);
     assert(expression == "hl.monitor({ output = \"OpenDisplay-42\", mode = "
                          "\"2420x1668@60\", position = \"1707x233\", scale = 2 })");
+}
+
+void preservesReferenceTransformInMonitorExpression() {
+    od::DisplayLayout layout;
+    layout.resolution = {.width = 1600, .height = 2560};
+    layout.logicalGeometry = {.x = 0, .y = 0, .width = 1000, .height = 1600};
+    layout.scale = 1.6;
+    layout.refreshRate = 60;
+    const auto expression = od::hyprlandMonitorExpression("eDP-1", layout, 1);
+    assert(expression.find("transform = 1") != std::string::npos);
 }
 
 void rejectsSemanticHyprctlErrorsWithZeroExitStatus() {
@@ -71,6 +83,7 @@ int main() {
     detectsDesktopWithoutChangingLegacyFallback();
     parsesHyprctlMonitorJson();
     producesCurrentHyprlandMonitorExpression();
+    preservesReferenceTransformInMonitorExpression();
     rejectsSemanticHyprctlErrorsWithZeroExitStatus();
     producesCurrentHyprlandFocusExpression();
 }

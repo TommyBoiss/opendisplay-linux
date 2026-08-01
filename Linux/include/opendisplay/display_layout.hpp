@@ -23,8 +23,10 @@ struct DisplayOutput {
     bool enabled = false;
     bool focused = false;
     Size resolution;
+    double refreshRate = 60.0;
     Rect logicalGeometry;
     double scale = 1.0;
+    int transform = 0;
     std::optional<PhysicalSize> physicalSize;
     std::vector<DisplayMode> modes;
 };

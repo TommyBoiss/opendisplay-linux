@@ -31,6 +31,7 @@ private:
     QString sessionPath_;
     std::string virtualOutputName_;
     bool outputCreated_ = false;
+    bool referencePinned_ = false;
     bool inputEnabled_ = false;
 };
 

@@ -134,7 +134,10 @@ RemoteDesktop portal. Current Hyprland Lua monitor rules are used first, with
 the pre-0.55 `keyword monitor` command as a compatibility fallback. The
 headless output is removed when the session stops. Before XDPH opens its share
 picker, OpenDisplay restores focus and cursor placement to the selected
-reference monitor so the authorization prompt remains reachable.
+reference monitor so the authorization prompt remains reachable. The reference
+output is temporarily pinned to its detected geometry while the headless output
+exists, preventing Hyprland `auto` rules from reversing their relative order;
+the user's configuration is reloaded after teardown.
 
 If Bonjour discovery is unavailable, confirm that the phone app is open and
 inspect the advertised service with `avahi-browse -rt _opensidecar._tcp`.

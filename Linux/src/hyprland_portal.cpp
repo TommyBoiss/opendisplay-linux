@@ -58,7 +58,8 @@ PortalCapture HyprlandPortal::start(const DesktopRequest& request) {
             virtualOutputName_ = "OpenDisplay-"
                 + std::to_string(QCoreApplication::applicationPid());
             outputCreated_ = true;
-            const auto configured = outputs_.create(virtualOutputName_, layout);
+            referencePinned_ = true;
+            const auto configured = outputs_.create(virtualOutputName_, layout, reference);
             inputOutputName = configured.name;
             captureWidth = layout.resolution.width;
             captureHeight = layout.resolution.height;
@@ -162,6 +163,15 @@ void HyprlandPortal::stop() {
     }
     outputCreated_ = false;
     virtualOutputName_.clear();
+    if (referencePinned_) {
+        try {
+            outputs_.reload();
+            debug("Reloaded Hyprland configuration after removing temporary monitor rules");
+        } catch (const std::exception& error) {
+            debug(std::string("Cannot restore Hyprland monitor rules: ") + error.what());
+        }
+    }
+    referencePinned_ = false;
 }
 
 void HyprlandPortal::pointer(const std::string_view phase, const double normalizedX,
