@@ -38,6 +38,19 @@ void selectsReferenceDeterministically() {
     assert(rejected);
 }
 
+void detectsAddedOutputAcrossKscreenRenumbering() {
+    const std::vector before{monitor("1", "eDP-1")};
+    const std::vector after{
+        monitor("1", "Virtual-virtual-xdp-kde-org.kde.konsole"),
+        monitor("2", "eDP-1"),
+    };
+    assert(od::sameDisplayOutput(before.front(), after.back()));
+    const auto added = od::addedDisplayOutputs(before, after);
+    assert(added.size() == 1);
+    assert(added.front().name == "Virtual-virtual-xdp-kde-org.kde.konsole");
+    assert(added.front().id == "1");
+}
+
 void defaultsToBottomRight() {
     const auto layout = od::planDisplayLayout(monitor("1", "eDP-1"), ipad(), {}, 60);
     assert(layout.resolution.width == 2420);
@@ -96,6 +109,7 @@ void derivesScaleFromPhysicalDensity() {
 
 int main() {
     selectsReferenceDeterministically();
+    detectsAddedOutputAcrossKscreenRenumbering();
     defaultsToBottomRight();
     makesFractionalModesLogicallyIntegral();
     supportsEveryPlacementAxis();

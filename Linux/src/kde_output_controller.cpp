@@ -11,7 +11,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iterator>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -36,10 +35,6 @@ bool isQuarterTurn(const int rotation) {
     // variants add 16. Only left/right exchange the logical axes.
     const int unflipped = rotation & 0x0f;
     return unflipped == 2 || unflipped == 8;
-}
-
-bool sameOutput(const DisplayOutput& left, const DisplayOutput& right) {
-    return left.id == right.id && left.name == right.name;
 }
 
 bool hasMode(const DisplayOutput& output, const Size size, const int refreshRate) {
@@ -150,14 +145,7 @@ DisplayOutput KdeOutputController::waitForAddedOutput(
     std::vector<DisplayOutput> current;
     while (timer.elapsed() < timeout.count()) {
         current = outputs();
-        std::vector<DisplayOutput> added;
-        std::copy_if(current.begin(), current.end(), std::back_inserter(added),
-                     [&](const auto& candidate) {
-                         return candidate.connected
-                             && std::none_of(before.begin(), before.end(), [&](const auto& old) {
-                                    return sameOutput(candidate, old);
-                                });
-                     });
+        const auto added = addedDisplayOutputs(before, current);
         if (added.size() == 1) return added.front();
         if (added.size() > 1) {
             throw std::runtime_error(
@@ -177,7 +165,7 @@ bool KdeOutputController::waitForRemovedOutput(
     while (timer.elapsed() < timeout.count()) {
         const auto current = outputs();
         if (std::none_of(current.begin(), current.end(), [&](const auto& candidate) {
-                return sameOutput(candidate, output);
+                return sameDisplayOutput(candidate, output);
             })) {
             return true;
         }
@@ -188,9 +176,16 @@ bool KdeOutputController::waitForRemovedOutput(
 
 OutputTranslation KdeOutputController::apply(const DisplayOutput& output,
                                              const DisplayLayout& layout) const {
-    DisplayOutput current = output;
+    auto snapshot = outputs();
+    const auto activeOutput = std::find_if(
+        snapshot.begin(), snapshot.end(),
+        [&](const auto& candidate) { return sameDisplayOutput(candidate, output); });
+    if (activeOutput == snapshot.end()) {
+        throw std::runtime_error("KDE virtual output disappeared before it could be configured");
+    }
+    DisplayOutput current = *activeOutput;
     if (!hasMode(current, layout.resolution, layout.refreshRate)) {
-        const auto command = "output." + output.id + ".addCustomMode."
+        const auto command = "output." + current.id + ".addCustomMode."
             + std::to_string(layout.resolution.width) + '.'
             + std::to_string(layout.resolution.height) + '.'
             + std::to_string(layout.refreshRate * 1'000) + ".full";
@@ -207,7 +202,7 @@ OutputTranslation KdeOutputController::apply(const DisplayOutput& output,
         while (timer.elapsed() < 3'000) {
             const auto all = outputs();
             const auto found = std::find_if(all.begin(), all.end(), [&](const auto& candidate) {
-                return sameOutput(candidate, output);
+                return sameDisplayOutput(candidate, output);
             });
             if (found != all.end() && hasMode(*found, layout.resolution, layout.refreshRate)) {
                 current = *found;
@@ -224,10 +219,18 @@ OutputTranslation KdeOutputController::apply(const DisplayOutput& output,
         + std::to_string(layout.resolution.height) + '@'
         + std::to_string(layout.refreshRate);
     auto all = outputs();
+    const auto refreshed = std::find_if(all.begin(), all.end(), [&](const auto& candidate) {
+        return sameDisplayOutput(candidate, output);
+    });
+    if (refreshed == all.end()) {
+        throw std::runtime_error("KDE virtual output disappeared before layout was applied");
+    }
+    current = *refreshed;
     int minimumX = layout.logicalGeometry.x;
     int minimumY = layout.logicalGeometry.y;
     for (const auto& candidate : all) {
-        if (candidate.connected && candidate.enabled && !sameOutput(candidate, output)) {
+        if (candidate.connected && candidate.enabled
+            && !sameDisplayOutput(candidate, current)) {
             minimumX = std::min(minimumX, candidate.logicalGeometry.x);
             minimumY = std::min(minimumY, candidate.logicalGeometry.y);
         }
@@ -235,15 +238,16 @@ OutputTranslation KdeOutputController::apply(const DisplayOutput& output,
     const int shiftX = std::max(0, -minimumX);
     const int shiftY = std::max(0, -minimumY);
     std::vector<std::string> commands{
-        "output." + output.id + ".mode." + mode,
-        "output." + output.id + ".scale." + scaleText(layout.scale),
-        "output." + output.id + ".position."
+        "output." + current.id + ".mode." + mode,
+        "output." + current.id + ".scale." + scaleText(layout.scale),
+        "output." + current.id + ".position."
             + std::to_string(layout.logicalGeometry.x + shiftX) + ','
             + std::to_string(layout.logicalGeometry.y + shiftY),
     };
     if (shiftX != 0 || shiftY != 0) {
         for (const auto& candidate : all) {
-            if (candidate.connected && candidate.enabled && !sameOutput(candidate, output)) {
+            if (candidate.connected && candidate.enabled
+                && !sameDisplayOutput(candidate, current)) {
                 commands.push_back("output." + candidate.id + ".position."
                     + std::to_string(candidate.logicalGeometry.x + shiftX) + ','
                     + std::to_string(candidate.logicalGeometry.y + shiftY));
@@ -251,7 +255,7 @@ OutputTranslation KdeOutputController::apply(const DisplayOutput& output,
         }
     }
     run(commands);
-    log("Configured KDE output " + output.name + " as " + mode + " at scale "
+    log("Configured KDE output " + current.name + " as " + mode + " at scale "
         + scaleText(layout.scale) + ", position "
         + std::to_string(layout.logicalGeometry.x + shiftX) + ','
         + std::to_string(layout.logicalGeometry.y + shiftY));
@@ -264,7 +268,8 @@ void KdeOutputController::restorePositions(
     std::vector<std::string> commands;
     for (const auto& previous : previousOutputs) {
         const auto found = std::find_if(current.begin(), current.end(), [&](const auto& candidate) {
-            return candidate.connected && candidate.enabled && sameOutput(candidate, previous);
+            return candidate.connected && candidate.enabled
+                && sameDisplayOutput(candidate, previous);
         });
         if (found != current.end()) {
             commands.push_back("output." + found->id + ".position."

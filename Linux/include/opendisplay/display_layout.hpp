@@ -38,6 +38,12 @@ struct DisplayLayout {
     bool adjustedResolution = false;
 };
 
+/// KScreen numeric ids are snapshot-local and can change when an output is
+/// inserted. Connector names are the stable identity within a compositor
+/// session; the id is only a fallback for incomplete backend data.
+bool sameDisplayOutput(const DisplayOutput& left, const DisplayOutput& right);
+std::vector<DisplayOutput> addedDisplayOutputs(const std::vector<DisplayOutput>& before,
+                                               const std::vector<DisplayOutput>& after);
 DisplayOutput selectReferenceOutput(const std::vector<DisplayOutput>& outputs,
                                     const std::string& requested);
 DisplayLayout planDisplayLayout(const DisplayOutput& detectedReference,

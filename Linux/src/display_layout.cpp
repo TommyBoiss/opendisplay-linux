@@ -84,6 +84,26 @@ void validateAlignment(const ExtendDirection extendTo, const AlignDirection alig
 
 }  // namespace
 
+bool sameDisplayOutput(const DisplayOutput& left, const DisplayOutput& right) {
+    if (!left.name.empty() && !right.name.empty()) {
+        return left.name == right.name;
+    }
+    return !left.id.empty() && left.id == right.id;
+}
+
+std::vector<DisplayOutput> addedDisplayOutputs(const std::vector<DisplayOutput>& before,
+                                               const std::vector<DisplayOutput>& after) {
+    std::vector<DisplayOutput> added;
+    std::copy_if(after.begin(), after.end(), std::back_inserter(added),
+                 [&](const auto& candidate) {
+                     return candidate.connected
+                         && std::none_of(before.begin(), before.end(), [&](const auto& old) {
+                                return sameDisplayOutput(candidate, old);
+                            });
+                 });
+    return added;
+}
+
 DisplayOutput selectReferenceOutput(const std::vector<DisplayOutput>& outputs,
                                     const std::string& requested) {
     std::vector<DisplayOutput> active;
