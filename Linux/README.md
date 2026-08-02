@@ -1,15 +1,16 @@
-# OpenDisplay Linux CLI MVP
+# OpenDisplay for Linux
 
 This target connects the existing, unmodified iOS/iPadOS receiver to a KDE or
 Hyprland Wayland session. It discovers `_opensidecar._tcp` services with Avahi
 or opens the receiver's port through usbmuxd, captures with PipeWire, and
-streams Annex B H.264 produced by FFmpeg. There is no desktop GUI.
+streams Annex B H.264 produced by FFmpeg. The command-line client and an
+initial Kirigami control application share the same connection engine.
 
 ## Arch Linux dependencies
 
 ```sh
-sudo pacman -S --needed base-devel cmake qt6-base qt6-wayland pipewire avahi \
-  libusbmuxd usbmuxd ffmpeg libkscreen wayland \
+sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-wayland \
+  kirigami pipewire avahi libusbmuxd usbmuxd ffmpeg libkscreen wayland \
   xdg-desktop-portal xdg-desktop-portal-kde
 ```
 
@@ -71,8 +72,15 @@ pushed branch, not uncommitted files in the current worktree. Push a commit to
 Open the existing OpenDisplay app on the iOS device, then run:
 
 ```sh
+./build/linux/opendisplay-gui
 ./build/linux/opendisplay-linux --transport auto --mode extend
 ```
+
+The GUI exposes the CLI defaults and common monitor-layout overrides. It uses
+the desktop's StatusNotifier tray when available. On a compositor without a
+compatible tray host it remains a normal launcher window, and closing the
+window exits instead of leaving an invisible background process. On Hyprland,
+a StatusNotifier-capable bar such as Waybar enables tray behavior.
 
 The compositor backend is detected automatically; override it with
 `--compositor kde` or `--compositor hyprland`. The first run displays the

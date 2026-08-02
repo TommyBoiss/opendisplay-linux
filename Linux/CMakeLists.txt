@@ -18,6 +18,10 @@ pkg_check_modules(USBMUXD REQUIRED IMPORTED_TARGET libusbmuxd-2.0)
 pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
 
+set(OPENDISPLAY_BUILD_GUI AUTO CACHE STRING
+    "Build the Kirigami GUI (AUTO, ON, or OFF)")
+set_property(CACHE OPENDISPLAY_BUILD_GUI PROPERTY STRINGS AUTO ON OFF)
+
 set(VIRTUAL_POINTER_XML
     ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-virtual-pointer-unstable-v1.xml)
 set(PROTOCOL_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
@@ -34,13 +38,12 @@ add_custom_command(
     VERBATIM
 )
 
-add_executable(opendisplay-linux
+set(OPENDISPLAY_CORE_SOURCES
     include/opendisplay/kde_portal.hpp
     include/opendisplay/hyprland_portal.hpp
     include/opendisplay/xdg_portal.hpp
     ${VIRTUAL_POINTER_HEADER}
     ${VIRTUAL_POINTER_CODE}
-    src/main.cpp
     src/desktop_backend_factory.cpp
     src/display_layout.cpp
     src/discovery.cpp
@@ -58,8 +61,10 @@ add_executable(opendisplay-linux
     src/xdg_portal.cpp
 )
 
-target_include_directories(opendisplay-linux PRIVATE include ${PROTOCOL_OUTPUT_DIR})
-target_link_libraries(opendisplay-linux PRIVATE
+add_library(opendisplay-core STATIC ${OPENDISPLAY_CORE_SOURCES})
+set_target_properties(opendisplay-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(opendisplay-core PUBLIC include PRIVATE ${PROTOCOL_OUTPUT_DIR})
+target_link_libraries(opendisplay-core PUBLIC
     Qt6::Core
     Qt6::DBus
     Qt6::Gui
@@ -71,18 +76,75 @@ target_link_libraries(opendisplay-linux PRIVATE
     Threads::Threads
 )
 
-target_compile_options(opendisplay-linux PRIVATE
+target_compile_options(opendisplay-core PRIVATE
     -Wall -Wextra -Wpedantic -Wconversion -Wshadow
 )
 
 if(KF6Screen_VERSION VERSION_GREATER_EQUAL "6.6")
-    target_compile_definitions(opendisplay-linux PRIVATE OD_KSCREEN_HAS_CUSTOM_MODES=1)
+    target_compile_definitions(opendisplay-core PRIVATE OD_KSCREEN_HAS_CUSTOM_MODES=1)
 else()
-    target_compile_definitions(opendisplay-linux PRIVATE OD_KSCREEN_HAS_CUSTOM_MODES=0)
+    target_compile_definitions(opendisplay-core PRIVATE OD_KSCREEN_HAS_CUSTOM_MODES=0)
 endif()
-target_compile_definitions(opendisplay-linux PRIVATE
+target_compile_definitions(opendisplay-core PRIVATE
     OD_KSCREEN_VERSION_STRING="${KF6Screen_VERSION}"
 )
+
+add_executable(opendisplay-linux src/main.cpp)
+target_link_libraries(opendisplay-linux PRIVATE opendisplay-core)
+target_compile_options(opendisplay-linux PRIVATE
+    -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+)
+
+if(NOT OPENDISPLAY_BUILD_GUI STREQUAL "OFF")
+    find_package(Qt6 6.5 QUIET COMPONENTS Quick Qml QuickControls2 Widgets)
+    find_package(KF6Kirigami 6.3 QUIET)
+    if(TARGET Qt6::Quick AND TARGET Qt6::Qml AND TARGET Qt6::QuickControls2
+       AND TARGET Qt6::Widgets AND TARGET KF6::Kirigami)
+        qt_policy(SET QTP0001 NEW)
+        if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8")
+            qt_policy(SET QTP0004 NEW)
+        endif()
+        set_source_files_properties(gui/qml/Main.qml PROPERTIES
+            QT_RESOURCE_ALIAS Main.qml)
+        qt_add_executable(opendisplay-gui
+            gui/gui_controller.cpp
+            gui/gui_controller.hpp
+            gui/gui_main.cpp
+            gui/session_worker.cpp
+            gui/session_worker.hpp
+        )
+        qt_add_qml_module(opendisplay-gui
+            URI org.opendisplay.desktop
+            VERSION 1.0
+            NO_IMPORT_SCAN
+            QML_FILES gui/qml/Main.qml
+        )
+        target_link_libraries(opendisplay-gui PRIVATE
+            opendisplay-core
+            Qt6::Quick
+            Qt6::Qml
+            Qt6::QuickControls2
+            Qt6::Widgets
+            KF6::Kirigami
+        )
+        target_compile_options(opendisplay-gui PRIVATE
+            -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+        )
+        install(TARGETS opendisplay-gui RUNTIME DESTINATION bin)
+        install(FILES gui/org.opendisplay.desktop.desktop
+            DESTINATION share/applications)
+        install(FILES ../public/icon-256.png
+            DESTINATION share/icons/hicolor/256x256/apps
+            RENAME org.opendisplay.desktop.png)
+    elseif(OPENDISPLAY_BUILD_GUI STREQUAL "ON")
+        message(FATAL_ERROR
+            "The GUI requires Qt 6 Quick/Widgets and KF6Kirigami. "
+            "Install qt6-declarative and kirigami on Arch Linux.")
+    else()
+        message(STATUS
+            "Qt Quick or KF6Kirigami was not found; building the CLI only")
+    endif()
+endif()
 
 include(CTest)
 if(BUILD_TESTING)

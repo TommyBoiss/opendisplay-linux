@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OpenDisplay
+Comment=Use an iOS device as a Wayland display
+Exec=opendisplay-gui
+Icon=org.opendisplay.desktop
+Terminal=false
+Categories=Utility;System;
+StartupNotify=true
