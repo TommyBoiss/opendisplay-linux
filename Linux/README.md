@@ -55,9 +55,10 @@ ctest --test-dir build/linux --output-on-failure
 
 ## Build and install the Arch package
 
-The `-git` package follows the pushed `linux-port` branch on the `gitea`
-remote. From the repository root, use a clean package build so an older clone
-of `main` cannot remain in makepkg's `src/` directory:
+The `-git` package follows the pushed `linux-port` branch on the public
+[GitHub repository](https://github.com/tixwho/opendisplay-linux). From the
+repository root, use a clean package build so an older clone of `main` cannot
+remain in makepkg's `src/` directory:
 
 ```sh
 (cd Linux/packaging/arch && makepkg --cleanbuild --syncdeps --install)
@@ -65,7 +66,7 @@ of `main` cannot remain in makepkg's `src/` directory:
 
 The short equivalent is `makepkg -Csi`. Building the package consumes the
 pushed branch, not uncommitted files in the current worktree. Push a commit to
-`gitea/linux-port` before packaging when testing new local changes.
+`origin/linux-port` before packaging when testing new local changes.
 
 ## Run
 
