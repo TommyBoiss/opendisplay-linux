@@ -17,6 +17,21 @@ sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-wayland \
 For Hyprland, also install `hyprland xdg-desktop-portal-hyprland`. The package
 keeps the KDE dependencies so one binary can select either backend.
 
+## Flatpak
+
+The GUI is also distributed as a self-contained Flatpak that bundles its own
+Qt6 runtime, so there is no host Qt version-mismatch problem and no runtime
+dependencies to install. Grab the `.flatpak` bundle from the
+[GitHub releases](https://github.com/TommyBoiss/opendisplay-linux/releases)
+page, or build it yourself:
+
+```sh
+Linux/packaging/flatpak/build-flatpak.sh
+```
+
+See [Linux/packaging/flatpak/README.md](packaging/flatpak/README.md) for build
+requirements, bundled library licenses, and sandbox notes.
+
 ## Fedora
 
 ### Prebuilt binaries

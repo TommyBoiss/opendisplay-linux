@@ -1,0 +1,114 @@
+id: org.opendisplay.desktop
+runtime: org.kde.Platform
+runtime-version: "6.7"
+sdk: org.kde.Sdk
+command: opendisplay-gui
+
+finish-args:
+  # Wayland + X11 fallback for the GUI window.
+  - --socket=wayland
+  - --socket=x11
+  # Network is required for mDNS discovery and streaming to the iPad over Wi-Fi.
+  - --share=network
+  # Hardware video encode through VA-API (/dev/dri).
+  - --device=dri
+  # Talk to the host portals for screen capture and input.
+  - --talk-name=org.freedesktop.portal.*
+  - --talk-name=org.freedesktop.portal.ScreenCast
+  - --talk-name=org.freedesktop.portal.RemoteDesktop
+  - --talk-name=org.freedesktop.ScreenSaver
+
+  # --- Paths that need host access on some setups ---
+  # VA-API render node (some drivers want a specific node rather than --device=dri).
+  - --filesystem=/dev/dri
+  # Hyprland's hyprctl communicates over the host's /tmp/hypr socket. Granting
+  # /tmp lets --compositor hyprland drive the headless output from inside the
+  # sandbox. If you only use KDE, you can drop this line.
+  - --filesystem=/tmp
+
+modules:
+  # avahi-client is used for _opensidecar._tcp mDNS discovery. The KDE/freedesktop
+  # runtime does not ship it, so bundle it. Build only the client library the
+  # project links against.
+  - name: avahi
+    config-opts:
+      - --enable-shared
+      - --disable-static
+      - --disable-mono
+      - --disable-gtk
+      - --disable-gtk3
+      - --disable-qt4
+      - --disable-qt5
+      - --disable-python
+      - --disable-python-dbus
+      - --disable-gdbm
+    sources:
+      - type: git
+        url: https://github.com/avahi/avahi.git
+        tag: v0.8
+    post-install:
+      - install -Dm644 LICENSE /app/share/licenses/avahi/LICENSE
+
+  # libusbmuxd + libplist are used by the USB transport. The runtime does not
+  # ship them, so bundle them from source.
+  - name: libplist
+    buildsystem: cmake-ninja
+    sources:
+      - type: git
+        url: https://github.com/libimobiledevice/libplist.git
+        tag: 2.3.0
+    cleanup:
+      - /bin
+      - /include
+      - /lib/pkgconfig
+    post-install:
+      - install -Dm644 /run/build/libplist/COPYING /app/share/licenses/libplist/COPYING
+
+  - name: libimobiledevice-glue
+    buildsystem: cmake-ninja
+    sources:
+      - type: git
+        url: https://github.com/libimobiledevice/libimobiledevice-glue.git
+        tag: 1.2.0
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    post-install:
+      - install -Dm644 /run/build/libimobiledevice-glue/COPYING /app/share/licenses/libimobiledevice-glue/COPYING
+
+  - name: libusbmuxd
+    buildsystem: cmake-ninja
+    depends:
+      - libplist
+      - libimobiledevice-glue
+    sources:
+      - type: git
+        url: https://github.com/libimobiledevice/libusbmuxd.git
+        tag: 2.0.2
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    post-install:
+      - install -Dm644 /run/build/libusbmuxd/COPYING /app/share/licenses/libusbmuxd/COPYING
+
+  # The main app. Reuses the repo's CMake target; the container build and this
+  # Flatpak share the same opendisplay-core engine.
+  - name: opendisplay-gui
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DOPENDISPLAY_BUILD_GUI=ON
+      - -DBUILD_TESTING=OFF
+      - -DCMAKE_INSTALL_PREFIX=/app
+    sources:
+      - type: dir
+        path: ../..
+      # AppStream metadata (CMake does not install this).
+      - type: file
+        path: org.opendisplay.desktop.metainfo.xml
+      # Project license (GPL-3.0) ships alongside the app.
+      - type: file
+        path: ../../../LICENSE
+    build-commands:
+      - install -Dm644 org.opendisplay.desktop.metainfo.xml /app/share/metainfo/org.opendisplay.desktop.metainfo.xml
+      - install -Dm644 LICENSE /app/share/licenses/opendisplay/LICENSE

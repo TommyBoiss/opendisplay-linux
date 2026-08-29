@@ -46,9 +46,18 @@ when offered by the upstream project.
 OpenDisplay for Linux requires **Qt6** (Qt 6.5+), which is pulled in
 automatically by the package managers below.
 
-Prebuilt Fedora binaries are attached to the
+**Flatpak (recommended, no Qt needed).** The GUI ships as a self-contained
+Flatpak that bundles its own Qt6 — grab the `.flatpak` bundle from the
+[releases](https://github.com/TommyBoiss/opendisplay-linux/releases) page:
+
+```sh
+flatpak install --user org.opendisplay.desktop-*.flatpak
+flatpak run org.opendisplay.desktop
+```
+
+**Fedora binaries.** Prebuilt binaries are attached to the
 [releases](https://github.com/TommyBoiss/opendisplay-linux/releases) page — no
-compiling needed. To install the runtime dependencies instead:
+compiling needed. Just install the runtime dependencies and run:
 
 ```sh
 sudo dnf install qt6-qtbase qt6-qtdeclarative qt6-qtquickcontrols2 qt6-qtwayland \

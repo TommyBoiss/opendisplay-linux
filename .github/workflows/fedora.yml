@@ -82,3 +82,33 @@ jobs:
             build/linux/opendisplay-linux
             build/linux/opendisplay-gui
           if-no-files-found: error
+
+  flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub/flatpak-builder:latest
+      options: --privileged --device=/dev/fuse
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Flatpak deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            /root/.local/share/flatpak
+            build/flatpak-repo
+          key: flatpak-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            flatpak-${{ github.ref }}
+            flatpak-main
+
+      - name: Build Flatpak
+        run: |
+          Linux/packaging/flatpak/build-flatpak.sh
+
+      - name: Upload Flatpak bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: opendisplay-gui-flatpak
+          path: build/org.opendisplay.desktop-*.flatpak
+          if-no-files-found: error

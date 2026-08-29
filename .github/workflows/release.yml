@@ -145,6 +145,39 @@ jobs:
             opendisplay-linux-linux-$(uname -m).tar.gz \
             opendisplay-linux-linux-$(uname -m).zip
 
+  build-flatpak:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub/flatpak-builder:latest
+      options: --privileged --device=/dev/fuse
+    env:
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Flatpak deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            /root/.local/share/flatpak
+            build/flatpak-repo
+          key: release-flatpak-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            release-flatpak-${{ github.ref }}
+            release-flatpak-main
+
+      - name: Build Flatpak
+        run: Linux/packaging/flatpak/build-flatpak.sh
+
+      - name: Upload Flatpak artifact to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
+            build/org.opendisplay.desktop-*.flatpak
+
   build-mac:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
