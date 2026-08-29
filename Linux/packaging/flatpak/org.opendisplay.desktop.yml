@@ -137,21 +137,26 @@ modules:
   # The main app. Reuses the repo's CMake target; the container build and this
   # Flatpak share the same opendisplay-core engine.
   - name: opendisplay-gui
-    buildsystem: cmake-ninja
-    config-opts:
-      - -DCMAKE_BUILD_TYPE=Release
-      - -DOPENDISPLAY_BUILD_GUI=ON
-      - -DBUILD_TESTING=OFF
-      - -DCMAKE_INSTALL_PREFIX=/app
+    buildsystem: simple
+    build-commands:
+      # Configure from the repo's Linux/ subdirectory (the module source root is
+      # the repository root, which contains Linux/CMakeLists.txt).
+      - cmake -S Linux -B _build -DCMAKE_BUILD_TYPE=Release -DOPENDISPLAY_BUILD_GUI=ON -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=/app
+      - cmake --build _build --parallel
+      - cmake --install _build
+      # AppStream metadata, icon, and project license (CMake cannot install
+      # files outside its source dir).
+      - install -Dm644 org.opendisplay.desktop.metainfo.xml /app/share/metainfo/org.opendisplay.desktop.metainfo.xml
+      - install -Dm644 public/icon-256.png /app/share/icons/hicolor/256x256/apps/org.opendisplay.desktop.png
+      - install -Dm644 LICENSE /app/share/licenses/opendisplay/LICENSE
     sources:
+      # Repo root so Linux/CMakeLists.txt and public/icon-256.png are present.
       - type: dir
-        path: ../..
+        path: ../../..
       # AppStream metadata (CMake does not install this).
       - type: file
         path: org.opendisplay.desktop.metainfo.xml
       # Project license (GPL-3.0) ships alongside the app.
       - type: file
         path: ../../../LICENSE
-    build-commands:
-      - install -Dm644 org.opendisplay.desktop.metainfo.xml /app/share/metainfo/org.opendisplay.desktop.metainfo.xml
-      - install -Dm644 LICENSE /app/share/licenses/opendisplay/LICENSE
+        dest-filename: LICENSE

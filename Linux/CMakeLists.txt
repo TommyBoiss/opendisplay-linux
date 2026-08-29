@@ -133,9 +133,15 @@ if(NOT OPENDISPLAY_BUILD_GUI STREQUAL "OFF")
         install(TARGETS opendisplay-gui RUNTIME DESTINATION bin)
         install(FILES gui/org.opendisplay.desktop.desktop
             DESTINATION share/applications)
-        install(FILES ../public/icon-256.png
-            DESTINATION share/icons/hicolor/256x256/apps
-            RENAME org.opendisplay.desktop.png)
+        # The icon lives outside Linux/ in the repository; skip it when building
+        # from a source tree that does not include it (e.g. Flatpak module).
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../public/icon-256.png")
+            install(FILES ../public/icon-256.png
+                DESTINATION share/icons/hicolor/256x256/apps
+                RENAME org.opendisplay.desktop.png)
+        else()
+            message(STATUS "public/icon-256.png not found; skipping icon install")
+        endif()
     elseif(OPENDISPLAY_BUILD_GUI STREQUAL "ON")
         message(FATAL_ERROR
             "The GUI requires Qt 6 Quick/Widgets and KF6Kirigami. "
