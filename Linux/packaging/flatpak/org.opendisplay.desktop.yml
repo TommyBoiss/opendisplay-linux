@@ -32,6 +32,9 @@ modules:
   # project links against.
   - name: avahi
     config-opts:
+      # The Flatpak build sandbox has no /etc/*-release, so avahi's distro
+      # autodetection fails. "none" builds the generic Linux target.
+      - --with-distro=none
       - --enable-shared
       - --disable-static
       - --disable-mono
