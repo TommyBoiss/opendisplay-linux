@@ -18,18 +18,20 @@ concurrency:
 
 jobs:
   build:
-    runs-on: fedora
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Enable RPM Fusion (for ffmpeg-devel / libx264)
         run: |
-          sudo dnf install -y \
+          dnf install -y \
             https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 
       - name: Install build dependencies
         run: |
-          sudo dnf install -y \
+          dnf install -y \
             cmake gcc-c++ ninja-build \
             qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel \
             kf6-kirigami-devel libkscreen-devel \
