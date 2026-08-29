@@ -79,10 +79,9 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // The receiver video page (pushed when receiving).
-    component ReceiverPage: org.opendisplay.desktop.ReceiverPage {
-        controller: root.controller
-    }
+    // ReceiverPage.qml is in the same module, so the receiverPage property
+    // holds a Component that instantiates it with the controller injected.
+    property Component receiverPage: Component { ReceiverPage { controller: root.controller } }
 
     pageStack.initialPage: Kirigami.ScrollablePage {
         id: page
