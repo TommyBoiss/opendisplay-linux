@@ -35,6 +35,15 @@ modules:
       # The Flatpak build sandbox has no /etc/*-release, so avahi's distro
       # autodetection fails. "none" builds the generic Linux target.
       - --with-distro=none
+      # Only avahi-client is used (D-Bus client to the host's avahi-daemon);
+      # skip every optional integration the KDE runtime does not provide.
+      - --disable-libevent
+      - --disable-gobject
+      - --disable-introspection
+      - --disable-autoipd
+      - --disable-manpages
+      - --disable-xmltoman
+      - --disable-libdaemon
       - --enable-shared
       - --disable-static
       - --disable-mono
@@ -45,6 +54,8 @@ modules:
       - --disable-python
       - --disable-python-dbus
       - --disable-gdbm
+      # NOTE: D-Bus stays enabled — avahi-client talks to the host's
+      # avahi-daemon over the system bus, so this is required.
     sources:
       - type: git
         url: https://github.com/avahi/avahi.git
