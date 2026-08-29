@@ -36,7 +36,7 @@ jobs:
             qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel \
             kf6-kirigami-devel libkscreen-devel \
             pipewire-devel avahi-devel libusbmuxd-devel wayland-devel \
-            ffmpeg-devel
+            ffmpeg ffmpeg-devel
 
       - name: Configure
         run: |
