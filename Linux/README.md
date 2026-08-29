@@ -17,11 +17,24 @@ sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-wayland \
 For Hyprland, also install `hyprland xdg-desktop-portal-hyprland`. The package
 keeps the KDE dependencies so one binary can select either backend.
 
-For hardware encoding, install the driver for the GPU: `libva-mesa-driver` for AMD,
-`intel-media-driver` for modern Intel GPUs, or `nvidia-utils` for NVIDIA.
-`libva-utils` is useful for checking VA-API with `vainfo`. The process must be
-able to open `/dev/dri/renderD128`; normal Arch installations grant this through
-the active desktop session.
+## Fedora dependencies
+
+```sh
+sudo dnf install cmake gcc-c++ ninja-build qt6-qtbase-devel \
+  qt6-qtdeclarative-devel qt6-qtwayland-devel \
+  kf6-kirigami-devel libkscreen-devel pipewire-devel \
+  avahi-devel libusbmuxd-devel wayland-devel \
+  ffmpeg-devel xdg-desktop-portal xdg-desktop-portal-kde
+```
+
+For Hyprland, also install `hyprland xdg-desktop-portal-hyprland`. The package
+keeps the KDE dependencies so one binary can select either backend.
+
+For hardware encoding, install the driver for the GPU: `mesa-va-drivers` for AMD,
+`intel-media-driver` for modern Intel GPUs, or `nvidia-vaapi-driver`/`nvidia-driver`
+for NVIDIA. `libva-utils` is useful for checking VA-API with `vainfo`. The process
+must be able to open `/dev/dri/renderD128`; normal Fedora installations grant
+this through the active desktop session.
 
 USB requires the device to be unlocked and paired with the machine. Accept the
 device's Trust prompt, then verify the usbmuxd path before starting OpenDisplay:
@@ -52,6 +65,26 @@ cmake -S Linux -B build/linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build/linux -j
 ctest --test-dir build/linux --output-on-failure
 ```
+
+On Fedora, the helper script checks dependencies, configures, builds, and runs
+the tests in one step:
+
+```sh
+Linux/packaging/fedora/build-fedora.sh          # build only
+Linux/packaging/fedora/build-fedora.sh install  # build and install to /usr/local
+Linux/packaging/fedora/build-fedora.sh rpm      # build an RPM package
+```
+
+On Fedora, the `encoder` test requires the `libx264` encoder, which the
+`ffmpeg-free` package does not ship. Install the non-free `ffmpeg` from RPM
+Fusion so the encoder test passes:
+
+```sh
+sudo dnf swap ffmpeg-free ffmpeg --allowerasing
+sudo dnf install ffmpeg-devel
+```
+
+All other tests pass with the free build.
 
 ## Build and install the Arch package
 
