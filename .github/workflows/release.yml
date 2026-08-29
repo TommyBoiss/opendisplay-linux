@@ -79,6 +79,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/ccache
+          key: release-linux-ccache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            release-linux-ccache-${{ github.ref }}
+            release-linux-ccache-main
+
+      - name: Restore dnf package cache
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/dnf
+          key: release-linux-dnf-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            release-linux-dnf-${{ github.ref }}
+            release-linux-dnf-main
+
       - name: Enable RPM Fusion (for ffmpeg-devel / libx264)
         run: |
           dnf install -y \
@@ -86,7 +104,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          dnf install -y \
+          dnf install -y ccache \
             cmake gcc-c++ ninja-build \
             qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel \
             kf6-kirigami-devel libkscreen-devel \
@@ -94,9 +112,14 @@ jobs:
             ffmpeg ffmpeg-devel
 
       - name: Configure
+        env:
+          CCACHE_DIR: /tmp/ccache
+          CCACHE_MAXSIZE: 500M
         run: |
           cmake -S Linux -B build/linux \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DOPENDISPLAY_BUILD_GUI=ON \
             -DBUILD_TESTING=ON
 
