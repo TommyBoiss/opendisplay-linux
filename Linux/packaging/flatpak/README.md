@@ -9,7 +9,7 @@ bundles its Qt6/KDE runtime, so there is no host Qt version-mismatch problem.
 sudo dnf install flatpak flatpak-builder
 flatpak remote-add --if-not-exists flathub \
   https://flathub.org/repo/flathub.flatpakrepo
-flatpak install flathub org.kde.Platform//6.7 org.kde.Sdk//6.7
+flatpak install flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
 
 ./Linux/packaging/flatpak/build-flatpak.sh
 ```
@@ -17,7 +17,7 @@ flatpak install flathub org.kde.Platform//6.7 org.kde.Sdk//6.7
 Install and run the resulting bundle:
 
 ```sh
-flatpak install --user build/org.opendisplay.desktop-6.7.flatpak
+flatpak install --user build/org.opendisplay.desktop-6.9.flatpak
 flatpak run org.opendisplay.desktop
 ```
 
@@ -32,7 +32,7 @@ flatpak run org.opendisplay.desktop
 | libusbmuxd | 2.0.2 | LGPL-2.1 | USB transport support |
 
 Qt6, KDE Frameworks (Kirigami, libkscreen), PipeWire, FFmpeg and xdg portals
-are pulled from the `org.kde.Platform//6.7` runtime rather than being bundled,
+are pulled from the `org.kde.Platform//6.9` runtime rather than being bundled,
 so their licenses live with the runtime itself.
 
 ## License compliance
