@@ -128,7 +128,11 @@ modules:
       - /lib/cmake
       - /share/man
     post-install:
-      - install -Dm644 /run/build/libkscreen/COPYING.LIB /app/share/licenses/libkscreen/COPYING.LIB
+      # libkscreen uses KDE's REUSE layout: license texts live in LICENSES/.
+      # Fail loudly if the directory moves so licenses never silently vanish.
+      - test -d /run/build/libkscreen/LICENSES
+      - mkdir -p /app/share/licenses/libkscreen
+      - cp -r /run/build/libkscreen/LICENSES/. /app/share/licenses/libkscreen/
 
   # The main app. Reuses the repo's CMake target; the container build and this
   # Flatpak share the same opendisplay-core engine.
