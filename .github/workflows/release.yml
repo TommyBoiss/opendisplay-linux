@@ -149,6 +149,9 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub/flatpak-github-actions:fedora
+      options: --privileged
     env:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:

@@ -85,6 +85,9 @@ jobs:
 
   flatpak:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub/flatpak-github-actions:fedora
+      options: --privileged
     steps:
       - uses: actions/checkout@v4
 
