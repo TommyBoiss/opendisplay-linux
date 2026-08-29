@@ -17,7 +17,30 @@ sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-wayland \
 For Hyprland, also install `hyprland xdg-desktop-portal-hyprland`. The package
 keeps the KDE dependencies so one binary can select either backend.
 
-## Fedora dependencies
+## Fedora
+
+### Prebuilt binaries
+
+Grab the latest builds from the
+[GitHub releases](https://github.com/tixwho/opendisplay-linux/releases) page —
+no compiling needed. Just install the runtime dependencies and run:
+
+```sh
+sudo dnf install pipewire kf6-kirigami libkscreen \
+  xdg-desktop-portal xdg-desktop-portal-kde
+```
+
+### Building from source
+
+The setup script installs every build and runtime dependency, enables RPM
+Fusion (for `ffmpeg`/`libx264`), and handles the free/non-free decision for you:
+
+```sh
+Linux/packaging/fedora/setup.sh              # everything
+Linux/packaging/fedora/setup.sh --no-rpmfusion  # stay on Fedora's ffmpeg-free
+```
+
+If you prefer to install manually:
 
 ```sh
 sudo dnf install cmake gcc-c++ ninja-build qt6-qtbase-devel \

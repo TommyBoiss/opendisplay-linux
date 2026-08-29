@@ -18,7 +18,8 @@ check_deps() {
   for pkg in cmake gcc-c++ ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel \
       qt6-qtwayland-devel \
       kf6-kirigami-devel libkscreen-devel pipewire-devel avahi-devel \
-      libusbmuxd-devel wayland-devel ffmpeg-devel; do
+      libusbmuxd-devel wayland-devel \
+      ffmpeg-devel ffmpeg-free-devel ffmpeg; do
     if ! rpm -q "$pkg" >/dev/null 2>&1; then
       missing+=("$pkg")
     fi
@@ -27,6 +28,8 @@ check_deps() {
     echo "Missing build dependencies:" >&2
     printf '  %s\n' "${missing[@]}" >&2
     echo "Install them with:" >&2
+    echo "  Linux/packaging/fedora/setup.sh" >&2
+    echo "  # or manually:" >&2
     echo "  sudo dnf install ${missing[*]}" >&2
     exit 1
   fi
