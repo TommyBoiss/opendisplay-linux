@@ -12,6 +12,7 @@ enum class EncoderKind { Auto, Vaapi, Nvenc, Software };
 enum class CompositorKind { Auto, Kde, Hyprland };
 enum class ExtendDirection { Left, Right, Top, Bottom };
 enum class AlignDirection { Left, Right, Top, Bottom, Center };
+enum class SessionRole { Sender, Receiver };
 
 struct Size {
     int width = 0;
@@ -86,6 +87,7 @@ struct EncodedFrame {
 };
 
 struct Options {
+    SessionRole role = SessionRole::Sender;
     TransportKind transport = TransportKind::Auto;
     CaptureMode mode = CaptureMode::Extend;
     EncoderKind encoder = EncoderKind::Auto;

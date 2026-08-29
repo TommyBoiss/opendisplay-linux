@@ -58,6 +58,19 @@ std::optional<PhoneInfo> parseHello(const QJsonObject& object) {
     return info;
 }
 
+std::string hello(const PhoneInfo& info) {
+    QJsonObject object{
+        {"type", "hello"},
+        {"pixelsWide", info.pixelsWide},
+        {"pixelsHigh", info.pixelsHigh},
+        {"scale", info.scale},
+        {"device", QString::fromStdString(info.device)},
+        {"id", QString::fromStdString(info.installId)},
+        {"pv", protocolVersion},
+    };
+    return QJsonDocument(object).toJson(QJsonDocument::Compact).toStdString();
+}
+
 std::string welcome() {
     QJsonObject object{
         {"type", "welcome"},

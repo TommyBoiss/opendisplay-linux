@@ -32,5 +32,11 @@ private:
 
 Socket connectTcp(const std::string& host, std::uint16_t port);
 Socket connectUsb(int deviceHandle, std::uint16_t port);
+/// Bind and listen on all interfaces (0.0.0.0) at `port`. Returns a listening
+/// socket; call accept() on it to obtain a connected peer.
+Socket listenTcp(std::uint16_t port);
+/// Accept a single pending connection from a listening socket. Returns an
+/// invalid socket if interrupted or the listener is closed.
+Socket acceptConnection(const Socket& listener);
 
 }  // namespace od

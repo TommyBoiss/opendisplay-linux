@@ -16,7 +16,7 @@ BUILD_DIR="${ROOT}/build/linux"
 check_deps() {
   local missing=()
   for pkg in cmake gcc-c++ ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel \
-      qt6-qtwayland-devel \
+      qt6-qtwayland-devel qt6-qtmultimedia-devel \
       kf6-kirigami-devel libkscreen-devel pipewire-devel avahi-devel \
       libusbmuxd-devel wayland-devel \
       ffmpeg-devel ffmpeg-free-devel ffmpeg; do

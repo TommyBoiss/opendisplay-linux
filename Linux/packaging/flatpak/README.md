@@ -3,6 +3,9 @@
 Builds the OpenDisplay GUI (`opendisplay-gui`) as a self-contained Flatpak that
 bundles its Qt6/KDE runtime, so there is no host Qt version-mismatch problem.
 
+The GUI can act as a **sender** (use an iPad as a display) or a **receiver**
+(act as a display for a Mac or another Linux machine, forwarding input back).
+
 ## Build
 
 ```sh
@@ -21,12 +24,20 @@ flatpak install --user build/org.opendisplay.desktop-6.10.flatpak
 flatpak run org.opendisplay.desktop
 ```
 
+## Receiver mode
+
+Choose **Receive** in the Role dropdown. The app advertises itself as an
+`_opensidecar._tcp` service, listens on the configured port (default 9000),
+and displays the incoming H.264 stream. Mouse/touch and wheel input are
+forwarded back to the sender. The advertised resolution follows the video
+window; resizing re-negotiates with the sender.
+
 ## What it bundles
 
 | Module | Version | License | Why |
 |--------|---------|---------|-----|
 | OpenDisplay GUI | repo | GPL-3.0-only | the app itself |
-| avahi | v0.8 | LGPL-2.1-or-later | `_opensidecar._tcp` mDNS discovery |
+| avahi | v0.8 | LGPL-2.1-or-later | `_opensidecar._tcp` mDNS discovery + advertisement |
 | libplist | 2.7.0 | LGPL-2.1 | USB transport support |
 | libimobiledevice-glue | 1.3.2 | LGPL-2.1 | USB transport support |
 | libusbmuxd | 2.1.1 | LGPL-2.1 | USB transport support |

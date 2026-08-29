@@ -36,6 +36,12 @@ od::TransportKind transport(const QString& value) {
     throw std::runtime_error("Transport must be Auto, Wi-Fi, or USB.");
 }
 
+od::SessionRole role(const QString& value) {
+    if (value == QStringLiteral("send")) return od::SessionRole::Sender;
+    if (value == QStringLiteral("receive")) return od::SessionRole::Receiver;
+    throw std::runtime_error("Role must be Send or Receive.");
+}
+
 od::CaptureMode mode(const QString& value) {
     if (value == QStringLiteral("extend")) return od::CaptureMode::Extend;
     if (value == QStringLiteral("mirror")) return od::CaptureMode::Mirror;
@@ -102,12 +108,16 @@ od::Size pixelSize(const QString& value) {
 
 od::Options optionsFrom(const QVariantMap& values) {
     od::Options options;
+    options.role = role(text(values, "role", "send"));
     options.transport = transport(text(values, "transport", "auto"));
     options.mode = mode(text(values, "mode", "extend"));
     options.encoder = encoder(text(values, "encoder", "auto"));
     options.compositor = compositor(text(values, "compositor", "auto"));
     options.host = text(values, "host").toStdString();
     options.udid = text(values, "udid").toStdString();
+    options.serviceName = text(values, "serviceName", "OpenDisplay").toStdString();
+    options.port = static_cast<std::uint16_t>(
+        values.value(QStringLiteral("port"), 9000).toInt());
     options.display.referenceMonitor = text(values, "referenceMonitor").toStdString();
     options.display.extendTo = extendDirection(text(values, "extendTo", "right"));
     options.display.alignTo = alignDirection(text(values, "alignTo", "bottom"));
@@ -119,6 +129,9 @@ od::Options optionsFrom(const QVariantMap& values) {
 
     if (options.fps < 1 || options.fps > 240) {
         throw std::runtime_error("Frame rate must be between 1 and 240.");
+    }
+    if (options.port < 1) {
+        throw std::runtime_error("Listen port must be between 1 and 65535.");
     }
     if (bitrateMbps < 1.0 || bitrateMbps > 200.0) {
         throw std::runtime_error("Bitrate must be between 1 and 200 Mbps.");
@@ -157,6 +170,13 @@ GuiController::GuiController(QObject* parent)
     connect(&workerThread_, &QThread::finished, worker_, &QObject::deleteLater);
     connect(worker_, &SessionWorker::stateChanged,
             this, &GuiController::applyWorkerState);
+    connect(worker_, &SessionWorker::frameReady, this,
+            [this](const od::DecodedFrame& frame) {
+                currentFrame_ = QImage(reinterpret_cast<const uchar*>(frame.bgra.data()),
+                                       frame.width, frame.height, frame.width * 4,
+                                       QImage::Format_ARGB32).copy();
+                emit frameReady();
+            });
     workerThread_.start();
     createTray();
 }
@@ -198,6 +218,7 @@ void GuiController::connectDevice(const QVariantMap& values) {
 void GuiController::connectLast() {
     QVariantMap values = savedSettings();
     if (values.isEmpty()) {
+        values.insert(QStringLiteral("role"), QStringLiteral("send"));
         values.insert(QStringLiteral("transport"), QStringLiteral("auto"));
         values.insert(QStringLiteral("mode"), QStringLiteral("extend"));
         values.insert(QStringLiteral("encoder"), QStringLiteral("auto"));
@@ -209,6 +230,24 @@ void GuiController::connectLast() {
         values.insert(QStringLiteral("input"), true);
     }
     connectDevice(values);
+}
+
+void GuiController::setPanel(const int width, const int height, const double scale) {
+    QMetaObject::invokeMethod(worker_, [worker = worker_, width, height, scale]() {
+        worker->setPanel(width, height, scale);
+    }, Qt::QueuedConnection);
+}
+
+void GuiController::sendTouch(const QString& phase, const double x, const double y) {
+    QMetaObject::invokeMethod(worker_, [worker = worker_, phase, x, y]() {
+        worker->sendTouch(phase, x, y);
+    }, Qt::QueuedConnection);
+}
+
+void GuiController::sendScroll(const double dx, const double dy) {
+    QMetaObject::invokeMethod(worker_, [worker = worker_, dx, dy]() {
+        worker->sendScroll(dx, dy);
+    }, Qt::QueuedConnection);
 }
 
 void GuiController::disconnectDevice() {

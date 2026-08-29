@@ -20,6 +20,7 @@ std::string frame(std::string_view payload);
 std::optional<std::uint32_t> decodeLength(std::span<const char, 4> header);
 std::optional<QJsonObject> parseJson(std::string_view payload);
 std::optional<PhoneInfo> parseHello(const QJsonObject& object);
+std::string hello(const PhoneInfo& info);
 std::string welcome();
 std::string pong(double phoneTime, double hostTime);
 std::string videoPayload(const EncodedFrame& frame, std::int64_t sentAtMs);

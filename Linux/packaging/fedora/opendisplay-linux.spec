@@ -22,6 +22,7 @@ BuildRequires:  ninja-build
 BuildRequires:  qt6-qtbase-devel
 BuildRequires:  qt6-qtdeclarative-devel
 BuildRequires:  qt6-qtwayland-devel
+BuildRequires:  qt6-qtmultimedia-devel
 BuildRequires:  kf6-kirigami-devel
 BuildRequires:  libkscreen-devel
 BuildRequires:  pipewire-devel
@@ -34,6 +35,7 @@ BuildRequires:  pkgconfig
 Requires:       qt6-qtbase
 Requires:       qt6-qtdeclarative
 Requires:       qt6-qtwayland
+Requires:       qt6-qtmultimedia
 Requires:       kf6-kirigami
 Requires:       libkscreen
 Requires:       pipewire

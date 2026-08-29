@@ -44,9 +44,11 @@ set(OPENDISPLAY_CORE_SOURCES
     include/opendisplay/xdg_portal.hpp
     ${VIRTUAL_POINTER_HEADER}
     ${VIRTUAL_POINTER_CODE}
+    src/avahi_publish.cpp
     src/desktop_backend_factory.cpp
     src/display_layout.cpp
     src/discovery.cpp
+    src/ffmpeg_decoder.cpp
     src/ffmpeg_encoder.cpp
     src/kde_output_controller.cpp
     src/kde_portal.cpp
@@ -54,6 +56,7 @@ set(OPENDISPLAY_CORE_SOURCES
     src/hyprland_portal.cpp
     src/pipewire_capture.cpp
     src/pipewire_format.cpp
+    src/receiver_session.cpp
     src/session.cpp
     src/socket.cpp
     src/wire.cpp
@@ -96,7 +99,7 @@ target_compile_options(opendisplay-linux PRIVATE
 )
 
 if(NOT OPENDISPLAY_BUILD_GUI STREQUAL "OFF")
-    find_package(Qt6 6.5 QUIET COMPONENTS Quick Qml QuickControls2 Widgets)
+    find_package(Qt6 6.5 QUIET COMPONENTS Quick Qml QuickControls2 Widgets Multimedia)
     find_package(KF6Kirigami 6.3 QUIET)
     if(TARGET Qt6::Quick AND TARGET Qt6::Qml AND TARGET Qt6::QuickControls2
        AND TARGET Qt6::Widgets AND TARGET KF6::Kirigami)
@@ -118,6 +121,7 @@ if(NOT OPENDISPLAY_BUILD_GUI STREQUAL "OFF")
             VERSION 1.0
             NO_IMPORT_SCAN
             QML_FILES gui/qml/Main.qml
+            gui/qml/ReceiverPage.qml
         )
         target_link_libraries(opendisplay-gui PRIVATE
             opendisplay-core
@@ -125,6 +129,7 @@ if(NOT OPENDISPLAY_BUILD_GUI STREQUAL "OFF")
             Qt6::Qml
             Qt6::QuickControls2
             Qt6::Widgets
+            Qt6::Multimedia
             KF6::Kirigami
         )
         target_compile_options(opendisplay-gui PRIVATE
@@ -183,6 +188,19 @@ if(BUILD_TESTING)
     target_compile_options(opendisplay-wire-tests PRIVATE -UNDEBUG)
     add_test(NAME wire COMMAND opendisplay-wire-tests)
 
+    add_executable(opendisplay-receiver-tests
+        tests/receiver_tests.cpp
+        src/receiver_session.cpp
+        src/socket.cpp
+        src/wire.cpp
+    )
+    target_include_directories(opendisplay-receiver-tests PRIVATE include)
+    target_link_libraries(opendisplay-receiver-tests PRIVATE
+        Qt6::Core Threads::Threads PkgConfig::USBMUXD)
+    target_compile_options(opendisplay-receiver-tests PRIVATE -UNDEBUG)
+    add_test(NAME receiver COMMAND opendisplay-receiver-tests)
+    set_tests_properties(receiver PROPERTIES TIMEOUT 10)
+
     add_executable(opendisplay-encoder-tests
         tests/encoder_tests.cpp
         src/ffmpeg_encoder.cpp
@@ -193,6 +211,18 @@ if(BUILD_TESTING)
     target_compile_options(opendisplay-encoder-tests PRIVATE -UNDEBUG)
     add_test(NAME encoder COMMAND opendisplay-encoder-tests)
     set_tests_properties(encoder PROPERTIES TIMEOUT 15)
+
+    add_executable(opendisplay-decoder-tests
+        tests/decoder_tests.cpp
+        src/ffmpeg_decoder.cpp
+        src/ffmpeg_encoder.cpp
+        src/wire.cpp
+    )
+    target_include_directories(opendisplay-decoder-tests PRIVATE include)
+    target_link_libraries(opendisplay-decoder-tests PRIVATE Qt6::Core Threads::Threads)
+    target_compile_options(opendisplay-decoder-tests PRIVATE -UNDEBUG)
+    add_test(NAME decoder COMMAND opendisplay-decoder-tests)
+    set_tests_properties(decoder PROPERTIES TIMEOUT 15)
 
     add_executable(opendisplay-pipewire-format-tests
         tests/pipewire_format_tests.cpp

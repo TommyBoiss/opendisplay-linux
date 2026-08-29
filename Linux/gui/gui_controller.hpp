@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QImage>
 #include <QObject>
 #include <QSettings>
 #include <QThread>
@@ -23,6 +24,7 @@ class GuiController final : public QObject {
     Q_PROPERTY(bool trayAvailable READ trayAvailable NOTIFY trayAvailableChanged)
     Q_PROPERTY(bool quitting READ quitting NOTIFY quittingChanged)
     Q_PROPERTY(QVariantMap savedSettings READ savedSettings CONSTANT)
+    Q_PROPERTY(QImage currentFrame READ currentFrame NOTIFY frameReady)
 
 public:
     explicit GuiController(QObject* parent = nullptr);
@@ -35,17 +37,26 @@ public:
     [[nodiscard]] bool trayAvailable() const { return trayAvailable_; }
     [[nodiscard]] bool quitting() const { return quitting_; }
     [[nodiscard]] QVariantMap savedSettings() const;
+    [[nodiscard]] QImage currentFrame() const { return currentFrame_; }
 
     Q_INVOKABLE void connectDevice(const QVariantMap& values);
     Q_INVOKABLE void connectLast();
     Q_INVOKABLE void disconnectDevice();
     Q_INVOKABLE void quit();
+    /// Update the advertised panel size in receiver mode (window resize).
+    Q_INVOKABLE void setPanel(int width, int height, double scale);
+    /// Send a touch event back to the sender (receiver mode).
+    Q_INVOKABLE void sendTouch(const QString& phase, double x, double y);
+    /// Send a scroll event back to the sender (receiver mode).
+    Q_INVOKABLE void sendScroll(double dx, double dy);
 
 signals:
     void stateChanged();
     void trayAvailableChanged();
     void quittingChanged();
     void showWindowRequested();
+    /// Emitted with a decoded frame for the QML video surface (receiver mode).
+    void frameReady();
 
 private slots:
     void applyWorkerState(const QString& status, const QString& detail,
@@ -67,6 +78,7 @@ private:
     QTimer* trayPoll_ = nullptr;
     QString status_ = QStringLiteral("Disconnected");
     QString detail_ = QStringLiteral("Ready to connect.");
+    QImage currentFrame_;
     bool connected_ = false;
     bool busy_ = false;
     bool trayAvailable_ = false;

@@ -164,4 +164,38 @@ Socket connectUsb(const int deviceHandle, const std::uint16_t port) {
                              + "). Keep the receiver app open and verify `idevicepair validate`");
 }
 
+Socket listenTcp(const std::uint16_t port) {
+    Socket listener(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (!listener.valid()) {
+        throw std::runtime_error("cannot create listening socket: " + std::string(std::strerror(errno)));
+    }
+    const int enabled = 1;
+    setsockopt(listener.fd(), SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(port);
+    if (::bind(listener.fd(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+        throw std::runtime_error("cannot bind port " + std::to_string(port) + ": "
+                                 + std::string(std::strerror(errno)));
+    }
+    if (::listen(listener.fd(), 1) != 0) {
+        throw std::runtime_error("cannot listen on port " + std::to_string(port) + ": "
+                                 + std::string(std::strerror(errno)));
+    }
+    return listener;
+}
+
+Socket acceptConnection(const Socket& listener) {
+    sockaddr_in peer{};
+    socklen_t peerLength = sizeof(peer);
+    const int fd = ::accept(listener.fd(), reinterpret_cast<sockaddr*>(&peer), &peerLength);
+    if (fd < 0) {
+        return Socket();
+    }
+    const int enabled = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &enabled, sizeof(enabled));
+    return Socket(fd);
+}
+
 }  // namespace od

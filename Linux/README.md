@@ -6,12 +6,17 @@ or opens the receiver's port through usbmuxd, captures with PipeWire, and
 streams Annex B H.264 produced by FFmpeg. The command-line client and an
 initial Kirigami control application share the same connection engine.
 
+The GUI can also act as a **receiver**: it advertises itself as an
+`_opensidecar._tcp` service, listens for a sender (a Mac or another Linux
+machine), displays the incoming H.264 stream live, and forwards touch and
+scroll input back to the sender.
+
 ## Arch Linux dependencies
 
 ```sh
 sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-wayland \
-  kirigami pipewire avahi libusbmuxd usbmuxd ffmpeg libkscreen wayland \
-  xdg-desktop-portal xdg-desktop-portal-kde
+  qt6-multimedia-ffmpeg kirigami pipewire avahi libusbmuxd usbmuxd ffmpeg \
+  libkscreen wayland xdg-desktop-portal xdg-desktop-portal-kde
 ```
 
 For Hyprland, also install `hyprland xdg-desktop-portal-hyprland`. The package
@@ -167,6 +172,27 @@ desktop's capture permission dialog. Other useful forms are:
 ./build/linux/opendisplay-linux --encoder nvenc --mode mirror --no-input
 ./build/linux/opendisplay-linux --compositor hyprland --reference-monitor eDP-1
 ```
+
+## Receiver mode
+
+The GUI can act as a display for another machine instead of streaming to an
+iPad. Choose **Receive** in the Role dropdown, set the listen port (default
+9000) and device name, then Connect. The app advertises itself as an
+`_opensidecar._tcp` service and displays the incoming H.264 stream. Mouse and
+wheel input are forwarded back to the sender.
+
+The advertised resolution follows the video window; resizing the window
+re-negotiates with the sender (which rebuilds its pipeline to match).
+
+### USB
+
+The sender-side USB path (Linux → iPad via usbmuxd) is unchanged. For
+computer-to-computer USB, `usbmuxd` does not apply — it only multiplexes
+connections to Apple devices. Instead, use a USB network link (NCM/RNDIS via
+`g_ether`, or a USB-Ethernet adapter). The receiver binds `0.0.0.0` and
+advertises on all interfaces, so a sender reaches it over USB networking
+exactly like Wi-Fi, including mDNS discovery.
+
 
 ### Virtual monitor layout
 

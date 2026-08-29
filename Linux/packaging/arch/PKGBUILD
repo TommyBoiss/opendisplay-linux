@@ -1,11 +1,11 @@
 pkgname=opendisplay-linux-git
 pkgver=1.14.0.r0.g0173617
 pkgrel=4
-pkgdesc="Use an iOS device as a KDE or Hyprland Wayland display"
+pkgdesc="Use an iOS device as a KDE or Hyprland Wayland display, or act as a display for another machine"
 arch=('x86_64')
-url="https://github.com/tixwho/opendisplay-linux"
+url="https://github.com/TommyBoiss/opendisplay-linux"
 license=('GPL-3.0-only')
-depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'kirigami' 'pipewire' 'avahi'
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'qt6-multimedia-ffmpeg' 'kirigami' 'pipewire' 'avahi'
          'libusbmuxd' 'usbmuxd' 'ffmpeg' 'libkscreen>=6.6' 'wayland'
          'xdg-desktop-portal' 'xdg-desktop-portal-kde')
 makedepends=('cmake' 'git')

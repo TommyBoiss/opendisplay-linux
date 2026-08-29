@@ -27,12 +27,15 @@ Kirigami.ApplicationWindow {
 
     function connectionSettings() {
         return {
+            "role": roleBox.currentValue,
             "transport": transportBox.currentValue,
             "mode": modeBox.currentValue,
             "encoder": encoderBox.currentValue,
             "compositor": compositorBox.currentValue,
             "host": hostField.text,
             "udid": udidField.text,
+            "port": portSpin.value,
+            "serviceName": serviceNameField.text,
             "referenceMonitor": referenceField.text,
             "extendTo": extendBox.currentValue,
             "alignTo": alignBox.currentValue,
@@ -64,6 +67,21 @@ Kirigami.ApplicationWindow {
             root.raise()
             root.requestActivate()
         }
+
+        function onStateChanged() {
+            // In receive mode, show the video page once connected.
+            if (roleBox.currentValue === "receive" && root.controller.connected
+                && pageStack.currentItem !== receiverPage) {
+                pageStack.push(receiverPage)
+            } else if (roleBox.currentValue === "send" && pageStack.currentItem === receiverPage) {
+                pageStack.pop()
+            }
+        }
+    }
+
+    // The receiver video page (pushed when receiving).
+    component ReceiverPage: org.opendisplay.desktop.ReceiverPage {
+        controller: root.controller
     }
 
     pageStack.initialPage: Kirigami.ScrollablePage {
@@ -125,6 +143,18 @@ Kirigami.ApplicationWindow {
                 Layout.fillWidth: true
 
                 Controls.ComboBox {
+                    id: roleBox
+                    Kirigami.FormData.label: qsTr("Role:")
+                    textRole: "text"
+                    valueRole: "value"
+                    model: [
+                        { "text": qsTr("Send (use iPad as display)"), "value": "send" },
+                        { "text": qsTr("Receive (act as a display)"), "value": "receive" }
+                    ]
+                    Component.onCompleted: root.selectSaved(this, "role", "send")
+                }
+
+                Controls.ComboBox {
                     id: transportBox
                     Kirigami.FormData.label: qsTr("Connection:")
                     textRole: "text"
@@ -135,6 +165,7 @@ Kirigami.ApplicationWindow {
                         { "text": qsTr("USB"), "value": "usb" }
                     ]
                     Component.onCompleted: root.selectSaved(this, "transport", "auto")
+                    visible: roleBox.currentValue === "send"
                 }
 
                 Controls.TextField {
@@ -143,6 +174,7 @@ Kirigami.ApplicationWindow {
                     placeholderText: qsTr("Automatic discovery")
                     text: root.saved("host", "")
                     enabled: !root.controller.busy && transportBox.currentValue !== "usb"
+                    visible: roleBox.currentValue === "send"
                 }
 
                 Controls.TextField {
@@ -151,6 +183,24 @@ Kirigami.ApplicationWindow {
                     placeholderText: qsTr("First connected device")
                     text: root.saved("udid", "")
                     enabled: !root.controller.busy && transportBox.currentValue !== "wifi"
+                    visible: roleBox.currentValue === "send"
+                }
+
+                Controls.SpinBox {
+                    id: portSpin
+                    Kirigami.FormData.label: qsTr("Listen port:")
+                    from: 1
+                    to: 65535
+                    value: root.saved("port", 9000)
+                    visible: roleBox.currentValue === "receive"
+                }
+
+                Controls.TextField {
+                    id: serviceNameField
+                    Kirigami.FormData.label: qsTr("Device name:")
+                    placeholderText: qsTr("OpenDisplay")
+                    text: root.saved("serviceName", "OpenDisplay")
+                    visible: roleBox.currentValue === "receive"
                 }
 
                 Controls.ComboBox {
@@ -163,6 +213,7 @@ Kirigami.ApplicationWindow {
                         { "text": qsTr("Mirror"), "value": "mirror" }
                     ]
                     Component.onCompleted: root.selectSaved(this, "mode", "extend")
+                    visible: roleBox.currentValue === "send"
                 }
 
                 Controls.ComboBox {
@@ -177,19 +228,22 @@ Kirigami.ApplicationWindow {
                         { "text": qsTr("Software"), "value": "software" }
                     ]
                     Component.onCompleted: root.selectSaved(this, "encoder", "auto")
+                    visible: roleBox.currentValue === "send"
                 }
             }
 
-            Kirigami.Separator { Layout.fillWidth: true }
+            Kirigami.Separator { Layout.fillWidth: true; visible: roleBox.currentValue === "send" }
 
             Kirigami.Heading {
                 text: qsTr("Monitor layout")
                 level: 3
+                visible: roleBox.currentValue === "send"
             }
 
             Kirigami.FormLayout {
                 Layout.fillWidth: true
                 enabled: modeBox.currentValue === "extend" && !root.controller.busy
+                visible: roleBox.currentValue === "send"
 
                 Controls.ComboBox {
                     id: compositorBox
@@ -281,10 +335,11 @@ Kirigami.ApplicationWindow {
                 }
             }
 
-            Kirigami.Separator { Layout.fillWidth: true }
+            Kirigami.Separator { Layout.fillWidth: true; visible: roleBox.currentValue === "send" }
 
             Kirigami.FormLayout {
                 Layout.fillWidth: true
+                visible: roleBox.currentValue === "send"
 
                 Controls.SpinBox {
                     id: fpsSpin

@@ -4,9 +4,10 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
   <name>OpenDisplay</name>
-  <summary>Use an iOS device as a Wayland display</summary>
+  <summary>Use an iOS device as a Wayland display, or act as a display for another machine</summary>
   <description>
     <p>OpenDisplay connects an existing, unmodified iOS/iPadOS receiver to a KDE or Hyprland Wayland session. It discovers receivers over the network or USB, captures the desktop with PipeWire, and streams H.264 produced by FFmpeg to the device.</p>
+    <p>It can also act as a receiver itself: listen for a sender (a Mac or another Linux machine), display the incoming H.264 stream live, and forward touch and scroll input back to the sender.</p>
     <p>This package provides the graphical control application. The same engine also ships as a command-line client.</p>
   </description>
   <categories>

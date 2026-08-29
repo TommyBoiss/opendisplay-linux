@@ -30,6 +30,20 @@ int main() {
     assert(od::wire::containsAnnexBStartCode(std::string("abc\0\0\0\1xyz", 10)));
     assert(!od::wire::containsAnnexBStartCode("not h264"));
 
+    // hello() must round-trip through parseHello().
+    od::PhoneInfo advertised{.pixelsWide = 1920, .pixelsHigh = 1080, .scale = 1.0,
+                             .device = "Linux", .installId = "abc", .protocolVersion = 2};
+    const auto helloJson = od::wire::parseJson(od::wire::hello(advertised));
+    assert(helloJson);
+    const auto parsed = od::wire::parseHello(*helloJson);
+    assert(parsed);
+    assert(parsed->pixelsWide == 1920);
+    assert(parsed->pixelsHigh == 1080);
+    assert(parsed->scale == 1.0);
+    assert(parsed->device == "Linux");
+    assert(parsed->installId == "abc");
+    assert(parsed->protocolVersion == 2);
+
     od::EncodedFrame encoded{.capturedAtMs = 100, .annexB = std::string("\0\0\0\1x", 5)};
     const auto video = od::wire::videoPayload(encoded, 120);
     assert(video.starts_with("{\"cap\":100,\"snd\":120}"));

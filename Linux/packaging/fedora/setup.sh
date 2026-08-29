@@ -45,6 +45,7 @@ echo "==> Installing build and runtime dependencies"
 sudo dnf install -y \
   cmake gcc-c++ ninja-build \
   qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel \
+  qt6-qtmultimedia-devel \
   kf6-kirigami-devel libkscreen-devel \
   pipewire-devel avahi-devel libusbmuxd-devel wayland-devel \
   $FFMPEG \
