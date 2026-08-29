@@ -64,9 +64,12 @@ modules:
       - install -Dm644 LICENSE /app/share/licenses/avahi/LICENSE
 
   # libusbmuxd + libplist are used by the USB transport. The runtime does not
-  # ship them, so bundle them from source.
+  # ship them, so bundle them from source. These are autotools projects
+  # (autogen.sh/configure); flatpak-builder runs autogen.sh since a git
+  # checkout has no pre-generated configure script.
   - name: libplist
-    buildsystem: cmake-ninja
+    config-opts:
+      - --without-cython
     sources:
       - type: git
         url: https://github.com/libimobiledevice/libplist.git
@@ -75,11 +78,11 @@ modules:
       - /bin
       - /include
       - /lib/pkgconfig
+      - /share/man
     post-install:
       - install -Dm644 /run/build/libplist/COPYING /app/share/licenses/libplist/COPYING
 
   - name: libimobiledevice-glue
-    buildsystem: cmake-ninja
     sources:
       - type: git
         url: https://github.com/libimobiledevice/libimobiledevice-glue.git
@@ -87,14 +90,11 @@ modules:
     cleanup:
       - /include
       - /lib/pkgconfig
+      - /share/man
     post-install:
       - install -Dm644 /run/build/libimobiledevice-glue/COPYING /app/share/licenses/libimobiledevice-glue/COPYING
 
   - name: libusbmuxd
-    buildsystem: cmake-ninja
-    depends:
-      - libplist
-      - libimobiledevice-glue
     sources:
       - type: git
         url: https://github.com/libimobiledevice/libusbmuxd.git
@@ -102,6 +102,7 @@ modules:
     cleanup:
       - /include
       - /lib/pkgconfig
+      - /share/man
     post-install:
       - install -Dm644 /run/build/libusbmuxd/COPYING /app/share/licenses/libusbmuxd/COPYING
 
