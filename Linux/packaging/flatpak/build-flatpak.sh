@@ -5,7 +5,7 @@
 #   sudo dnf install flatpak flatpak-builder
 #   flatpak remote-add --if-not-exists flathub \
 #     https://flathub.org/repo/flathub.flatpakrepo
-#   flatpak install flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
+#   flatpak install flathub org.kde.Platform//6.10 org.kde.Sdk//6.10
 #
 # Usage (run from the repository root):
 #   Linux/packaging/flatpak/build-flatpak.sh
@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${ROOT}/build/flatpak"
 REPO_DIR="${ROOT}/build/flatpak-repo"
-RUNTIME_VERSION="6.9"
+RUNTIME_VERSION="6.10"
 APP_ID="org.opendisplay.desktop"
 
 # flatpak-builder runs module sources relative to the manifest's directory.
