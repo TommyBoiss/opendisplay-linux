@@ -1,0 +1,59 @@
+name: Build Fedora
+
+on:
+  push:
+    branches: [main, linux-port]
+    paths:
+      - "Linux/**"
+      - ".github/workflows/fedora.yml"
+  pull_request:
+    paths:
+      - "Linux/**"
+      - ".github/workflows/fedora.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fedora-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: fedora
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable RPM Fusion (for ffmpeg-devel / libx264)
+        run: |
+          sudo dnf install -y \
+            https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+
+      - name: Install build dependencies
+        run: |
+          sudo dnf install -y \
+            cmake gcc-c++ ninja-build \
+            qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel \
+            kf6-kirigami-devel libkscreen-devel \
+            pipewire-devel avahi-devel libusbmuxd-devel wayland-devel \
+            ffmpeg-devel
+
+      - name: Configure
+        run: |
+          cmake -S Linux -B build/linux \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOPENDISPLAY_BUILD_GUI=ON \
+            -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build/linux --parallel
+
+      - name: Test
+        run: ctest --test-dir build/linux --output-on-failure
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: opendisplay-linux-fedora
+          path: |
+            build/linux/opendisplay-linux
+            build/linux/opendisplay-gui
+          if-no-files-found: error
