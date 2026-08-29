@@ -187,11 +187,24 @@ re-negotiates with the sender (which rebuilds its pipeline to match).
 ### USB
 
 The sender-side USB path (Linux → iPad via usbmuxd) is unchanged. For
-computer-to-computer USB, `usbmuxd` does not apply — it only multiplexes
-connections to Apple devices. Instead, use a USB network link (NCM/RNDIS via
-`g_ether`, or a USB-Ethernet adapter). The receiver binds `0.0.0.0` and
-advertises on all interfaces, so a sender reaches it over USB networking
-exactly like Wi-Fi, including mDNS discovery.
+computer-to-computer links there are two options:
+
+- **usbmuxd protocol (recommended).** The receiver can speak the open usbmuxd
+  server protocol, so a sender using libusbmuxd reaches it with its existing
+  USB code path. On the receiver, pick **Receive** and **USB** as the
+  connection; on the sender, point `USBMUXD_SOCKET_ADDRESS` at the receiver:
+
+  ```sh
+  USBMUXD_SOCKET_ADDRESS=<receiver-ip>:<listen-port> ./opendisplay-linux ...
+  ```
+
+  The receiver advertises a virtual USB device; the sender's usual USB
+  discovery and `usbmuxd_connect` flow work unchanged. This runs over any TCP
+  link — Wi-Fi, Ethernet, or a USB network interface.
+
+- **USB network interface.** Create a USB network link (`g_ether`/NCM/RNDIS
+  or a USB-Ethernet adapter). The receiver binds `0.0.0.0` and advertises on
+  all interfaces, so a sender reaches it exactly like Wi-Fi.
 
 
 ### Virtual monitor layout

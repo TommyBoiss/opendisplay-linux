@@ -2,12 +2,14 @@
 
 #include "opendisplay/socket.hpp"
 #include "opendisplay/types.hpp"
+#include "opendisplay/usbmux_receiver.hpp"
 
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -41,6 +43,10 @@ public:
     /// Bind and listen on `port` (0.0.0.0). Advertises the given panel size.
     void start(std::uint16_t port, PhoneInfo panel, FrameCallback onFrame,
                ClosedCallback onClosed);
+    /// Speak the usbmuxd server protocol on `port`, so a sender using
+    /// libusbmuxd can reach this receiver with USBMUXD_SOCKET_ADDRESS.
+    void startUsbmux(std::uint16_t port, PhoneInfo panel, FrameCallback onFrame,
+                     ClosedCallback onClosed);
     /// Called by the Qt main loop. Returns false after the connection closes.
     bool tick();
     void stop();
@@ -57,6 +63,8 @@ public:
     [[nodiscard]] bool connected() const { return connected_.load(); }
     /// The port the listener actually bound (useful when started with port 0).
     [[nodiscard]] std::uint16_t boundPort() const;
+    /// The port the usbmuxd-protocol listener bound (0 when not running).
+    [[nodiscard]] std::uint16_t usbmuxPort() const;
 
 private:
     void acceptLoop();
@@ -66,14 +74,20 @@ private:
     void handleVideo(std::string_view payload);
     void sendHello();
     void closeWith(const std::string& reason);
+    /// Take ownership of an already-mux-negotiated socket (usbmuxd path).
+    void adoptSocket(Socket peer);
+    void usbmuxAcceptLoop();
 
     Socket listener_;
+    std::unique_ptr<UsbmuxReceiver> usbmux_;
+    std::thread usbmuxAcceptThread_;
     Socket socket_;
     std::thread acceptThread_;
     std::thread readThread_;
     std::atomic_bool running_ = false;
     std::atomic_bool connected_ = false;
     std::atomic<std::uint16_t> boundPort_ = 0;
+    std::atomic<std::uint16_t> usbmuxPort_ = 0;
     std::mutex sendMutex_;
     std::mutex stateMutex_;
     std::condition_variable stateCondition_;

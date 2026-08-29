@@ -59,6 +59,7 @@ set(OPENDISPLAY_CORE_SOURCES
     src/receiver_session.cpp
     src/session.cpp
     src/socket.cpp
+    src/usbmux_receiver.cpp
     src/wire.cpp
     src/wayland_virtual_pointer.cpp
     src/xdg_portal.cpp
@@ -192,6 +193,7 @@ if(BUILD_TESTING)
         tests/receiver_tests.cpp
         src/receiver_session.cpp
         src/socket.cpp
+        src/usbmux_receiver.cpp
         src/wire.cpp
     )
     target_include_directories(opendisplay-receiver-tests PRIVATE include)
@@ -200,6 +202,19 @@ if(BUILD_TESTING)
     target_compile_options(opendisplay-receiver-tests PRIVATE -UNDEBUG)
     add_test(NAME receiver COMMAND opendisplay-receiver-tests)
     set_tests_properties(receiver PROPERTIES TIMEOUT 10)
+
+    add_executable(opendisplay-usbmux-receiver-tests
+        tests/usbmux_receiver_tests.cpp
+        src/usbmux_receiver.cpp
+        src/socket.cpp
+        src/wire.cpp
+    )
+    target_include_directories(opendisplay-usbmux-receiver-tests PRIVATE include)
+    target_link_libraries(opendisplay-usbmux-receiver-tests PRIVATE
+        Qt6::Core Threads::Threads PkgConfig::USBMUXD)
+    target_compile_options(opendisplay-usbmux-receiver-tests PRIVATE -UNDEBUG)
+    add_test(NAME usbmux-receiver COMMAND opendisplay-usbmux-receiver-tests)
+    set_tests_properties(usbmux-receiver PROPERTIES TIMEOUT 10)
 
     add_executable(opendisplay-encoder-tests
         tests/encoder_tests.cpp

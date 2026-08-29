@@ -59,36 +59,53 @@ void SessionWorker::startReceiver(od::Options options) {
                       QStringLiteral("Waiting for a sender on port %1…").arg(options.port),
                       false, true);
     try {
-        // Advertise the receiver so senders can discover it.
-        const std::string publishError = od::publishReceiver(
-            options.serviceName, options.port, "linux-receiver");
-        if (!publishError.empty()) {
-            emit stateChanged(QStringLiteral("Connection failed"),
-                              QString::fromStdString(publishError), false, false);
-            return;
-        }
-        receiver_ = std::make_unique<od::ReceiverSession>();
-        decoder_ = std::make_unique<od::FfmpegDecoder>();
-        // The panel size is set by the GUI via panelChanged; start with a
-        // sensible default and let the GUI override it.
         od::PhoneInfo panel{.pixelsWide = 1920, .pixelsHigh = 1080, .scale = 1.0,
                             .device = "Linux", .installId = "linux-receiver",
                             .protocolVersion = 2};
-        receiver_->start(options.port, panel,
-                         [this](const od::ReceivedFrame& frame) {
-                             // Decode the Annex B and forward the frame.
-                             decoder_->submit(frame.bgra);
-                         },
-                         [this](const std::string& reason) {
-                             emit stateChanged(QStringLiteral("Disconnected"),
-                                               QString::fromStdString(reason), false, false);
-                         });
+        receiver_ = std::make_unique<od::ReceiverSession>();
+        decoder_ = std::make_unique<od::FfmpegDecoder>();
+        // usbmuxd protocol (senders reach us with USBMUXD_SOCKET_ADDRESS) or
+        // plain TCP, depending on the selected transport.
+        if (options.transport == od::TransportKind::Usb) {
+            receiver_->startUsbmux(options.port, panel,
+                                   [this](const od::ReceivedFrame& frame) {
+                                       decoder_->submit(frame.bgra);
+                                   },
+                                   [this](const std::string& reason) {
+                                       emit stateChanged(QStringLiteral("Disconnected"),
+                                                         QString::fromStdString(reason),
+                                                         false, false);
+                                   });
+        } else {
+            receiver_->start(options.port, panel,
+                            [this](const od::ReceivedFrame& frame) {
+                                decoder_->submit(frame.bgra);
+                            },
+                            [this](const std::string& reason) {
+                                emit stateChanged(QStringLiteral("Disconnected"),
+                                                  QString::fromStdString(reason),
+                                                  false, false);
+                            });
+            // Advertise over mDNS so senders can discover us.
+            const std::string publishError = od::publishReceiver(
+                options.serviceName, options.port, "linux-receiver");
+            if (!publishError.empty()) {
+                emit stateChanged(QStringLiteral("Connection failed"),
+                                  QString::fromStdString(publishError), false, false);
+                return;
+            }
+        }
         decoder_->start([this](const od::DecodedFrame& frame) {
             emit frameReady(frame);
         }, panel.pixelsWide, panel.pixelsHigh);
         timer_->start();
         emit stateChanged(QStringLiteral("Listening"),
-                          QStringLiteral("Waiting for a sender on port %1…").arg(options.port),
+                          options.transport == od::TransportKind::Usb
+                              ? QStringLiteral(
+                                    "Waiting for a sender (usbmuxd) on port %1…")
+                                    .arg(options.port)
+                              : QStringLiteral("Waiting for a sender on port %1…")
+                                    .arg(options.port),
                           false, true);
     } catch (const std::exception& error) {
         timer_->stop();

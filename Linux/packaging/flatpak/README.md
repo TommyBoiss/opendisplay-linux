@@ -32,6 +32,13 @@ and displays the incoming H.264 stream. Mouse/touch and wheel input are
 forwarded back to the sender. The advertised resolution follows the video
 window; resizing re-negotiates with the sender.
 
+With **USB** selected, the receiver instead speaks the open usbmuxd server
+protocol on that port, so a sender using libusbmuxd reaches it unchanged:
+
+```sh
+USBMUXD_SOCKET_ADDRESS=<receiver-ip>:<port> ./opendisplay-linux ...
+```
+
 ## What it bundles
 
 | Module | Version | License | Why |

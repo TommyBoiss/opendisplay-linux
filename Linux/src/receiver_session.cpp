@@ -1,6 +1,7 @@
 #include "opendisplay/receiver_session.hpp"
 
 #include "opendisplay/log.hpp"
+#include "opendisplay/usbmux_receiver.hpp"
 #include "opendisplay/wire.hpp"
 
 #include <QJsonDocument>
@@ -54,6 +55,36 @@ void ReceiverSession::start(const std::uint16_t port, const PhoneInfo panel,
 
 std::uint16_t ReceiverSession::boundPort() const { return boundPort_.load(); }
 
+void ReceiverSession::startUsbmux(const std::uint16_t port, const PhoneInfo panel,
+                                  FrameCallback onFrame, ClosedCallback onClosed) {
+    stop();
+    panel_ = panel;
+    onFrame_ = std::move(onFrame);
+    onClosed_ = std::move(onClosed);
+    usbmux_ = std::make_unique<UsbmuxReceiver>();
+    usbmux_->start(port, [this](Socket peer) { adoptSocket(std::move(peer)); });
+    usbmuxPort_.store(usbmux_->boundPort());
+    running_.store(true);
+}
+
+std::uint16_t ReceiverSession::usbmuxPort() const { return usbmuxPort_.load(); }
+
+void ReceiverSession::adoptSocket(Socket peer) {
+    // A new connection cancels any previous one.
+    if (socket_.valid()) {
+        socket_.close();
+    }
+    if (readThread_.joinable()) {
+        readThread_.join();
+    }
+    socket_ = std::move(peer);
+    connected_.store(true);
+    lastActivity_ = std::chrono::steady_clock::now();
+    lastPingSent_ = lastActivity_;
+    sendHello();
+    readThread_ = std::thread(&ReceiverSession::readLoop, this);
+}
+
 bool ReceiverSession::tick() {
     if (!running_.load()) {
         return false;
@@ -86,6 +117,11 @@ bool ReceiverSession::tick() {
 void ReceiverSession::stop() {
     running_.store(false);
     connected_.store(false);
+    if (usbmux_) {
+        usbmux_->stop();
+        usbmux_.reset();
+    }
+    usbmuxPort_.store(0);
     if (listener_.valid()) {
         listener_.close();
     }

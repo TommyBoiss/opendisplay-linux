@@ -164,7 +164,11 @@ Kirigami.ApplicationWindow {
                         { "text": qsTr("USB"), "value": "usb" }
                     ]
                     Component.onCompleted: root.selectSaved(this, "transport", "auto")
-                    visible: roleBox.currentValue === "send"
+                    // Visible in both roles: sending picks the transport to
+                    // reach the iPad; receiving picks how senders reach us
+                    // (Wi-Fi advertises over mDNS, USB speaks the usbmuxd
+                    // protocol on the listen port).
+                    visible: true
                 }
 
                 Controls.TextField {
