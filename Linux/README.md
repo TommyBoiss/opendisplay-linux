@@ -22,11 +22,12 @@ keeps the KDE dependencies so one binary can select either backend.
 ### Prebuilt binaries
 
 Grab the latest builds from the
-[GitHub releases](https://github.com/tixwho/opendisplay-linux/releases) page —
+[GitHub releases](https://github.com/TommyBoiss/opendisplay-linux/releases) page —
 no compiling needed. Just install the runtime dependencies and run:
 
 ```sh
-sudo dnf install pipewire kf6-kirigami libkscreen \
+sudo dnf install qt6-qtbase qt6-qtdeclarative qt6-qtquickcontrols2 qt6-qtwayland \
+  kf6-kirigami libkscreen pipewire \
   xdg-desktop-portal xdg-desktop-portal-kde
 ```
 
@@ -112,7 +113,7 @@ All other tests pass with the free build.
 ## Build and install the Arch package
 
 The `-git` package follows the pushed `linux-port` branch on the public
-[GitHub repository](https://github.com/tixwho/opendisplay-linux). From the
+[GitHub repository](https://github.com/TommyBoiss/opendisplay-linux). From the
 repository root, use a clean package build so an older clone of `main` cannot
 remain in makepkg's `src/` directory:
 

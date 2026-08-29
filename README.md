@@ -43,13 +43,34 @@ when offered by the upstream project.
 
 ## Linux installation and usage
 
-An Arch Linux `PKGBUILD` is provided under
+OpenDisplay for Linux requires **Qt6** (Qt 6.5+), which is pulled in
+automatically by the package managers below.
+
+Prebuilt Fedora binaries are attached to the
+[releases](https://github.com/TommyBoiss/opendisplay-linux/releases) page — no
+compiling needed. To install the runtime dependencies instead:
+
+```sh
+sudo dnf install qt6-qtbase qt6-qtdeclarative qt6-qtquickcontrols2 qt6-qtwayland \
+  kf6-kirigami libkscreen pipewire \
+  xdg-desktop-portal xdg-desktop-portal-kde
+```
+
+To build from source on Fedora, run the setup script to download everything
+(build and runtime deps plus RPM Fusion for `libx264`):
+
+```sh
+Linux/packaging/fedora/setup.sh
+Linux/packaging/fedora/build-fedora.sh
+```
+
+On Arch Linux, an `opendisplay-linux-git` `PKGBUILD` is provided under
 [`Linux/packaging/arch/`](Linux/packaging/arch/PKGBUILD). Source builds and the
 package include both `opendisplay-linux` and `opendisplay-gui`.
 
-For dependencies, package-building commands, Wi-Fi and USB setup, monitor
-placement and scaling options, KDE/Hyprland notes, and troubleshooting, use the
-dedicated [Linux README](Linux/README.md).
+For package-building commands, Wi-Fi and USB setup, monitor placement and
+scaling options, KDE/Hyprland notes, and troubleshooting, use the dedicated
+[Linux README](Linux/README.md).
 
 ## Upstream code and license
 
