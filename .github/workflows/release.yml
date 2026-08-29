@@ -149,9 +149,6 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/flathub/flatpak-builder:latest
-      options: --privileged --device=/dev/fuse
     env:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
@@ -161,22 +158,29 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            /root/.local/share/flatpak
-            build/flatpak-repo
+            ~/.local/share/flatpak
+            build/repo
+            build/flatpak
           key: release-flatpak-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
             release-flatpak-${{ github.ref }}
             release-flatpak-main
 
-      - name: Build Flatpak
-        run: Linux/packaging/flatpak/build-flatpak.sh
+      - name: Build Flatpak bundle
+        uses: bilelmoussaoui/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: org.opendisplay.desktop.flatpak
+          manifest-path: Linux/packaging/flatpak/org.opendisplay.desktop.yml
+          arch: x86_64
+          cache-key: release-flatpak-builder-${{ github.sha }}
+          build-bundle: true
 
       - name: Upload Flatpak artifact to release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${{ needs.release-please.outputs.tag_name }}" \
-            build/org.opendisplay.desktop-*.flatpak
+            org.opendisplay.desktop.flatpak
 
   build-mac:
     needs: release-please

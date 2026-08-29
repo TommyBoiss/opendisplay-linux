@@ -85,9 +85,6 @@ jobs:
 
   flatpak:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/flathub/flatpak-builder:latest
-      options: --privileged --device=/dev/fuse
     steps:
       - uses: actions/checkout@v4
 
@@ -95,20 +92,28 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            /root/.local/share/flatpak
-            build/flatpak-repo
+            ~/.local/share/flatpak
+            build/repo
+            build/flatpak
           key: flatpak-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
             flatpak-${{ github.ref }}
             flatpak-main
 
-      - name: Build Flatpak
-        run: |
-          Linux/packaging/flatpak/build-flatpak.sh
+      - name: Build Flatpak bundle
+        uses: bilelmoussaoui/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: org.opendisplay.desktop.flatpak
+          manifest-path: Linux/packaging/flatpak/org.opendisplay.desktop.yml
+          arch: x86_64
+          cache-key: flatpak-builder-${{ github.sha }}
+          build-bundle: true
 
       - name: Upload Flatpak bundle
         uses: actions/upload-artifact@v4
         with:
           name: opendisplay-gui-flatpak
-          path: build/org.opendisplay.desktop-*.flatpak
+          path: |
+            org.opendisplay.desktop.flatpak
+            build/org.opendisplay.desktop.flatpak
           if-no-files-found: error
