@@ -106,6 +106,30 @@ modules:
     post-install:
       - install -Dm644 /run/build/libusbmuxd/COPYING /app/share/licenses/libusbmuxd/COPYING
 
+  # libkscreen is the Plasma screen-management library. It is NOT part of the
+  # KDE Frameworks SDK (which is why find_package(KF6Screen) fails), so bundle
+  # it. Version 6.5.0 requires Qt 6.9 / KF6 6.18 / PlasmaWaylandProtocols 1.19,
+  # all satisfied by the org.kde.Platform 6.9 runtime/SDK.
+  - name: libkscreen
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+      - -DENABLE_TESTING=OFF
+      # KWin's Wayland backend requires WaylandServer-private API, which the
+      # SDK does not ship; the runtime backends (wayland/xrandr) still build.
+      - -DBUILD_KWAYLAND_BACKEND=OFF
+    sources:
+      - type: git
+        url: https://invent.kde.org/plasma/libkscreen.git
+        tag: v6.5.0
+    cleanup:
+      - /include
+      - /lib/cmake
+      - /share/man
+    post-install:
+      - install -Dm644 /run/build/libkscreen/COPYING.LIB /app/share/licenses/libkscreen/COPYING.LIB
+
   # The main app. Reuses the repo's CMake target; the container build and this
   # Flatpak share the same opendisplay-core engine.
   - name: opendisplay-gui
