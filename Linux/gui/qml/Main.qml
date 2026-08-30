@@ -67,21 +67,76 @@ Kirigami.ApplicationWindow {
             root.raise()
             root.requestActivate()
         }
+    }
 
-        function onStateChanged() {
-            // In receive mode, show the video page once connected.
-            if (roleBox.currentValue === "receive" && root.controller.connected
-                && pageStack.currentItem !== receiverPage) {
-                pageStack.push(receiverPage)
-            } else if (roleBox.currentValue === "send" && pageStack.currentItem === receiverPage) {
-                pageStack.pop()
+    // Full-window video overlay for receiver mode. Overlays the ENTIRE window
+    // (not the pageStack) so the video is unobstructed by Kirigami chrome.
+    Rectangle {
+        id: videoOverlay
+        anchors.fill: parent
+        visible: roleBox.currentValue === "receive" && root.controller.connected
+        color: "black"
+
+        Image {
+            id: videoImage
+            anchors.fill: parent
+            source: root.controller.currentFrame
+            fillMode: Image.PreserveAspectFit
+            cache: false
+            asynchronous: false
+            Connections {
+                target: root.controller
+                function onFrameReady() {
+                    videoImage.source = ""
+                    videoImage.source = root.controller.currentFrame
+                }
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onPressed: mouse => root.controller.sendTouch("began", mouse.x / width, mouse.y / height)
+            onPositionChanged: mouse => {
+                if (mouse.buttons & Qt.LeftButton) {
+                    root.controller.sendTouch("moved", mouse.x / width, mouse.y / height)
+                }
+            }
+            onReleased: mouse => root.controller.sendTouch("ended", mouse.x / width, mouse.y / height)
+            onWheel: wheel => root.controller.sendScroll(wheel.angleDelta.x / 120.0, wheel.angleDelta.y / 120.0)
+            onDoubleClicked: root.toggleFullscreen()
+        }
+
+        Shortcut {
+            sequence: "F11"
+            onActivated: root.toggleFullscreen()
+        }
+
+        // Floating controls (hidden in fullscreen).
+        Controls.ToolBar {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            visible: !root.isFullscreen
+            RowLayout {
+                anchors.fill: parent
+                Controls.Label {
+                    Layout.fillWidth: true
+                    text: root.controller.detail
+                    elide: Text.ElideRight
+                }
+                Controls.Button {
+                    text: qsTr("Fullscreen")
+                    icon.name: "view-fullscreen"
+                    onClicked: root.toggleFullscreen()
+                }
+                Controls.Button {
+                    text: qsTr("Disconnect")
+                    onClicked: root.controller.disconnectDevice()
+                }
             }
         }
     }
-
-    // ReceiverPage.qml is in the same module, so the receiverPage property
-    // holds a Component that instantiates it with the controller injected.
-    property Component receiverPage: Component { ReceiverPage { controller: root.controller } }
 
     pageStack.initialPage: Kirigami.ScrollablePage {
         id: page
@@ -395,6 +450,18 @@ Kirigami.ApplicationWindow {
                     onClicked: root.controller.connectDevice(root.connectionSettings())
                 }
             }
+        }
+    }
+
+    property bool isFullscreen: false
+
+    function toggleFullscreen() {
+        if (root.visibility === Window.FullScreen) {
+            root.visibility = Window.Windowed
+            root.isFullscreen = false
+        } else {
+            root.visibility = Window.FullScreen
+            root.isFullscreen = true
         }
     }
 }
