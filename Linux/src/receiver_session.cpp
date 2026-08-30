@@ -37,10 +37,12 @@ bool looksLikeControl(const std::string_view payload) {
 ReceiverSession::~ReceiverSession() { stop(); }
 
 void ReceiverSession::start(const std::uint16_t port, const PhoneInfo panel,
-                            FrameCallback onFrame, ClosedCallback onClosed) {
+                            FrameCallback onFrame, CursorCallback onCursor,
+                            ClosedCallback onClosed) {
     stop();
     panel_ = panel;
     onFrame_ = std::move(onFrame);
+    onCursor_ = std::move(onCursor);
     onClosed_ = std::move(onClosed);
     listener_ = listenTcp(port);
     // Query the actual bound port (needed when started with port 0).
@@ -56,10 +58,12 @@ void ReceiverSession::start(const std::uint16_t port, const PhoneInfo panel,
 std::uint16_t ReceiverSession::boundPort() const { return boundPort_.load(); }
 
 void ReceiverSession::startUsbmux(const std::uint16_t port, const PhoneInfo panel,
-                                  FrameCallback onFrame, ClosedCallback onClosed) {
+                                  FrameCallback onFrame, CursorCallback onCursor,
+                                  ClosedCallback onClosed) {
     stop();
     panel_ = panel;
     onFrame_ = std::move(onFrame);
+    onCursor_ = std::move(onCursor);
     onClosed_ = std::move(onClosed);
     usbmux_ = std::make_unique<UsbmuxReceiver>();
     usbmux_->start(port, [this](Socket peer) { adoptSocket(std::move(peer)); });
@@ -250,7 +254,36 @@ void ReceiverSession::handleControl(const std::string_view payload) {
     } else if (type == QStringLiteral("updateRequired")) {
         log("Sender requested an update: "
             + object->value("message").toString().toStdString());
+    } else if (type == QStringLiteral("cursor")) {
+        handleCursor(*object);
+    } else if (type == QStringLiteral("cursorImg")) {
+        handleCursorImage(*object);
     }
+}
+
+void ReceiverSession::handleCursor(const QJsonObject& object) {
+    if (!onCursor_) {
+        return;
+    }
+    CursorState state;
+    state.visible = object.value("v").toInt(0) != 0;
+    state.x = object.value("x").toDouble(0.0);
+    state.y = object.value("y").toDouble(0.0);
+    onCursor_(std::move(state));
+}
+
+void ReceiverSession::handleCursorImage(const QJsonObject& object) {
+    if (!onCursor_) {
+        return;
+    }
+    CursorState state;
+    state.visible = true;
+    state.width = object.value("nw").toDouble(0.0);
+    state.height = object.value("nh").toDouble(0.0);
+    state.anchorX = object.value("ax").toDouble(0.0);
+    state.anchorY = object.value("ay").toDouble(0.0);
+    state.png = object.value("png").toString().toStdString();
+    onCursor_(std::move(state));
 }
 
 void ReceiverSession::handleVideo(const std::string_view payload) {

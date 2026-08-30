@@ -76,6 +76,7 @@ int main() {
                            gotBigFrame = true;
                        }
                    },
+                   [&](const od::CursorState&) {},
                    [&](const std::string&) {});
 
     const auto port = receiver.boundPort();

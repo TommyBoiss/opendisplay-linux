@@ -35,6 +35,8 @@ signals:
                       bool connected, bool busy);
     /// Emitted when a decoded frame is ready for display (receiver mode).
     void frameReady(const od::DecodedFrame& frame);
+    /// Emitted when the sender updates the cursor sprite or position.
+    void cursorChanged(const od::CursorState& cursor);
     /// Emitted when the decoded stream's actual dimensions change, so the GUI
     /// can resize the advertised panel to match what the sender streams.
     void streamSizeChanged(int width, int height);

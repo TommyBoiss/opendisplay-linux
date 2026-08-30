@@ -28,6 +28,14 @@ class GuiController final : public QObject {
     Q_PROPERTY(QString currentFrame READ currentFrame NOTIFY frameReady)
     Q_PROPERTY(int streamWidth READ streamWidth NOTIFY streamSizeChanged)
     Q_PROPERTY(int streamHeight READ streamHeight NOTIFY streamSizeChanged)
+    Q_PROPERTY(bool cursorVisible READ cursorVisible NOTIFY cursorChanged)
+    Q_PROPERTY(double cursorX READ cursorX NOTIFY cursorChanged)
+    Q_PROPERTY(double cursorY READ cursorY NOTIFY cursorChanged)
+    Q_PROPERTY(double cursorWidth READ cursorWidth NOTIFY cursorChanged)
+    Q_PROPERTY(double cursorHeight READ cursorHeight NOTIFY cursorChanged)
+    Q_PROPERTY(double cursorAnchorX READ cursorAnchorX NOTIFY cursorChanged)
+    Q_PROPERTY(double cursorAnchorY READ cursorAnchorY NOTIFY cursorChanged)
+    Q_PROPERTY(QString cursorImage READ cursorImage NOTIFY cursorChanged)
 
 public:
     explicit GuiController(QObject* parent = nullptr);
@@ -43,8 +51,18 @@ public:
     [[nodiscard]] int streamWidth() const { return streamWidth_; }
     [[nodiscard]] int streamHeight() const { return streamHeight_; }
     [[nodiscard]] QString currentFrame() const { return currentFrame_; }
+    [[nodiscard]] bool cursorVisible() const { return cursorVisible_; }
+    [[nodiscard]] double cursorX() const { return cursorX_; }
+    [[nodiscard]] double cursorY() const { return cursorY_; }
+    [[nodiscard]] double cursorWidth() const { return cursorWidth_; }
+    [[nodiscard]] double cursorHeight() const { return cursorHeight_; }
+    [[nodiscard]] double cursorAnchorX() const { return cursorAnchorX_; }
+    [[nodiscard]] double cursorAnchorY() const { return cursorAnchorY_; }
+    [[nodiscard]] QString cursorImage() const { return cursorImage_; }
     /// The image provider QML uses to fetch the latest frame.
     [[nodiscard]] FrameProvider* frameProvider() { return &frameProvider_; }
+    /// The image provider QML uses to fetch the latest cursor sprite.
+    [[nodiscard]] FrameProvider* cursorProvider() { return &cursorProvider_; }
 
     Q_INVOKABLE void connectDevice(const QVariantMap& values);
     Q_INVOKABLE void connectLast();
@@ -66,6 +84,8 @@ signals:
     void frameReady();
     /// Emitted when the decoded stream's actual dimensions change.
     void streamSizeChanged();
+    /// Emitted when the sender updates the cursor sprite or position.
+    void cursorChanged();
 
 private slots:
     void applyWorkerState(const QString& status, const QString& detail,
@@ -89,8 +109,17 @@ private:
     QString detail_ = QStringLiteral("Ready to connect.");
     QString currentFrame_;
     FrameProvider frameProvider_;
+    FrameProvider cursorProvider_;
     int streamWidth_ = 0;
     int streamHeight_ = 0;
+    bool cursorVisible_ = false;
+    double cursorX_ = 0.0;
+    double cursorY_ = 0.0;
+    double cursorWidth_ = 0.0;
+    double cursorHeight_ = 0.0;
+    double cursorAnchorX_ = 0.0;
+    double cursorAnchorY_ = 0.0;
+    QString cursorImage_;
     bool connected_ = false;
     bool busy_ = false;
     bool trayAvailable_ = false;

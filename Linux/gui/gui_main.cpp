@@ -22,9 +22,11 @@ int main(int argc, char* argv[]) {
 
     od::gui::GuiController controller;
     QQmlApplicationEngine engine;
-    // Register the fast image provider so QML's Image can fetch decoded
-    // frames directly from the scene graph (image://opendisplay/frame).
+    // Register the fast image providers so QML's Image can fetch decoded
+    // frames and the cursor sprite directly from the scene graph
+    // (image://opendisplay/frame and image://opendisplay/cursor).
     engine.addImageProvider(QStringLiteral("opendisplay"), controller.frameProvider());
+    engine.addImageProvider(QStringLiteral("opendisplay-cursor"), controller.cursorProvider());
     engine.setInitialProperties({
         {QStringLiteral("controller"), QVariant::fromValue(&controller)},
     });

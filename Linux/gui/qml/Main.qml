@@ -93,6 +93,41 @@ Kirigami.ApplicationWindow {
             }
         }
 
+        // Cursor sprite rendered over the video. The sender reports the
+        // position normalized to the DISPLAY (video) area, so we map it onto
+        // the actual on-screen rect of the letterboxed video.
+        Item {
+            id: cursorLayer
+            anchors.fill: parent
+            visible: root.controller.cursorVisible
+            // The video's on-screen rect (PreserveAspectFit letterboxing).
+            readonly property real videoW: root.controller.streamWidth > 0
+                ? Math.min(width, height * root.controller.streamWidth / root.controller.streamHeight)
+                : width
+            readonly property real videoH: root.controller.streamWidth > 0
+                ? Math.min(height, width * root.controller.streamHeight / root.controller.streamWidth)
+                : height
+            readonly property real videoX: (width - videoW) / 2
+            readonly property real videoY: (height - videoH) / 2
+
+            Image {
+                id: cursorImage
+                source: root.controller.cursorImage
+                cache: false
+                asynchronous: false
+                // Sprite size is normalized to the display; scale to the video.
+                width: cursorLayer.videoW * root.controller.cursorWidth
+                height: cursorLayer.videoH * root.controller.cursorHeight
+                // Anchor the hotspot, then place at the normalized position.
+                x: cursorLayer.videoX + cursorLayer.videoW * root.controller.cursorX
+                   - width * root.controller.cursorAnchorX
+                y: cursorLayer.videoY + cursorLayer.videoH * root.controller.cursorY
+                   - height * root.controller.cursorAnchorY
+                sourceSize: Qt.size(width, height)
+                fillMode: Image.PreserveAspectFit
+            }
+        }
+
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
@@ -124,6 +159,14 @@ Kirigami.ApplicationWindow {
                     Layout.fillWidth: true
                     text: root.controller.detail
                     elide: Text.ElideRight
+                }
+                Controls.Label {
+                    // Show the ACTUAL decoded stream resolution, not the
+                    // advertised panel size.
+                    text: root.controller.streamWidth > 0
+                        ? root.controller.streamWidth + " × " + root.controller.streamHeight
+                        : ""
+                    color: Kirigami.Theme.disabledTextColor
                 }
                 Controls.Button {
                     text: qsTr("Fullscreen")
@@ -216,7 +259,7 @@ Kirigami.ApplicationWindow {
                     model: [
                         { "text": qsTr("Automatic"), "value": "auto" },
                         { "text": qsTr("Wi-Fi"), "value": "wifi" },
-                        { "text": qsTr("USB"), "value": "usb" }
+                        { "text": qsTr("USB (not working)"), "value": "usb" }
                     ]
                     Component.onCompleted: root.selectSaved(this, "transport", "auto")
                     // Visible in both roles: sending picks the transport to
@@ -224,6 +267,9 @@ Kirigami.ApplicationWindow {
                     // (Wi-Fi advertises over mDNS, USB speaks the usbmuxd
                     // protocol on the listen port).
                     visible: true
+                    // USB is not functional yet — keep it selectable but
+                    // clearly marked so users don't expect it to work.
+                    enabled: false
                 }
 
                 Controls.TextField {

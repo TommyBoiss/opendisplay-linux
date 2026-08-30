@@ -72,6 +72,9 @@ void SessionWorker::startReceiver(od::Options options) {
                                    [this](const od::ReceivedFrame& frame) {
                                        decoder_->submit(frame.bgra);
                                    },
+                                   [this](const od::CursorState& cursor) {
+                                       emit cursorChanged(cursor);
+                                   },
                                    [this](const std::string& reason) {
                                        emit stateChanged(QStringLiteral("Disconnected"),
                                                          QString::fromStdString(reason),
@@ -81,6 +84,9 @@ void SessionWorker::startReceiver(od::Options options) {
             receiver_->start(options.port, panel,
                             [this](const od::ReceivedFrame& frame) {
                                 decoder_->submit(frame.bgra);
+                            },
+                            [this](const od::CursorState& cursor) {
+                                emit cursorChanged(cursor);
                             },
                             [this](const std::string& reason) {
                                 emit stateChanged(QStringLiteral("Disconnected"),

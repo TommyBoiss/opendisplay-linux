@@ -4,6 +4,8 @@
 #include "opendisplay/types.hpp"
 #include "opendisplay/usbmux_receiver.hpp"
 
+#include <QJsonObject>
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -26,6 +28,20 @@ struct ReceivedFrame {
     std::string bgra;  // BGRA, width*height*4 bytes
 };
 
+/// Cursor state delivered to the GUI (receiver mode). The Mac sender streams
+/// a cursor sprite (base64 PNG) plus a normalized position; the receiver
+/// renders the sprite over the video at the given coordinates.
+struct CursorState {
+    bool visible = false;
+    double x = 0.0;  // normalized [0,1] within the display
+    double y = 0.0;  // normalized [0,1] within the display
+    double width = 0.0;    // normalized sprite width
+    double height = 0.0;   // normalized sprite height
+    double anchorX = 0.0;  // normalized hotspot within the sprite
+    double anchorY = 0.0;  // normalized hotspot within the sprite
+    std::string png;       // base64 PNG sprite (empty until cursorImg arrives)
+};
+
 /// Listens for a single sender, performs the receiver side of the wire
 /// handshake, and delivers decoded frames + control events. Mirrors the
 /// threading model of Session: a dedicated accept/read thread plus a
@@ -33,6 +49,7 @@ struct ReceivedFrame {
 class ReceiverSession {
 public:
     using FrameCallback = std::function<void(ReceivedFrame)>;
+    using CursorCallback = std::function<void(CursorState)>;
     using ClosedCallback = std::function<void(const std::string& reason)>;
 
     ReceiverSession() = default;
@@ -42,11 +59,11 @@ public:
 
     /// Bind and listen on `port` (0.0.0.0). Advertises the given panel size.
     void start(std::uint16_t port, PhoneInfo panel, FrameCallback onFrame,
-               ClosedCallback onClosed);
+               CursorCallback onCursor, ClosedCallback onClosed);
     /// Speak the usbmuxd server protocol on `port`, so a sender using
     /// libusbmuxd can reach this receiver with USBMUXD_SOCKET_ADDRESS.
     void startUsbmux(std::uint16_t port, PhoneInfo panel, FrameCallback onFrame,
-                     ClosedCallback onClosed);
+                    CursorCallback onCursor, ClosedCallback onClosed);
     /// Called by the Qt main loop. Returns false after the connection closes.
     bool tick();
     void stop();
@@ -72,6 +89,8 @@ private:
     bool send(std::string_view payload);
     void handleControl(std::string_view payload);
     void handleVideo(std::string_view payload);
+    void handleCursor(const QJsonObject& object);
+    void handleCursorImage(const QJsonObject& object);
     void sendHello();
     void closeWith(const std::string& reason);
     /// Take ownership of an already-mux-negotiated socket (usbmuxd path).
@@ -93,6 +112,7 @@ private:
     std::condition_variable stateCondition_;
     PhoneInfo panel_;
     FrameCallback onFrame_;
+    CursorCallback onCursor_;
     ClosedCallback onClosed_;
     std::string closeReason_;
     std::chrono::steady_clock::time_point lastActivity_{};

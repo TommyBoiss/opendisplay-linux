@@ -30,6 +30,7 @@ namespace {
 // decoder's reader thread to the main thread) is not silently dropped.
 const bool kFrameMetaTypeRegistered = [] {
     qRegisterMetaType<od::DecodedFrame>("od::DecodedFrame");
+    qRegisterMetaType<od::CursorState>("od::CursorState");
     return true;
 }();
 
@@ -196,6 +197,28 @@ GuiController::GuiController(QObject* parent)
                 streamWidth_ = width;
                 streamHeight_ = height;
                 emit streamSizeChanged();
+            });
+    connect(worker_, &SessionWorker::cursorChanged, this,
+            [this](const od::CursorState& cursor) {
+                cursorVisible_ = cursor.visible;
+                cursorX_ = cursor.x;
+                cursorY_ = cursor.y;
+                cursorWidth_ = cursor.width;
+                cursorHeight_ = cursor.height;
+                cursorAnchorX_ = cursor.anchorX;
+                cursorAnchorY_ = cursor.anchorY;
+                if (!cursor.png.empty()) {
+                    // Decode the base64 PNG sprite once and cache it in the
+                    // image provider so QML can draw it over the video.
+                    const QByteArray raw = QByteArray::fromBase64(
+                        QByteArray::fromStdString(cursor.png));
+                    QImage image;
+                    if (image.loadFromData(raw, "PNG")) {
+                        cursorProvider_.setFrame(image);
+                        cursorImage_ = QStringLiteral("image://opendisplay-cursor/cursor");
+                    }
+                }
+                emit cursorChanged();
             });
     workerThread_.start();
     createTray();
