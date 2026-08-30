@@ -8,6 +8,7 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <algorithm>
 #include <chrono>
 #include <exception>
 #include <string>
@@ -17,14 +18,17 @@ namespace {
 
 int primaryScreenWidth() {
     if (const QScreen* screen = QGuiApplication::primaryScreen()) {
-        return screen->size().width();
+        // Physical (max) pixel count: QScreen::size() is logical pixels, so
+        // multiply by the device pixel ratio to hit the panel's native
+        // resolution on HiDPI surfaces (e.g. a Surface at 150–200% scaling).
+        return qRound(screen->size().width() * screen->devicePixelRatio());
     }
     return 1920;
 }
 
 int primaryScreenHeight() {
     if (const QScreen* screen = QGuiApplication::primaryScreen()) {
-        return screen->size().height();
+        return qRound(screen->size().height() * screen->devicePixelRatio());
     }
     return 1080;
 }
@@ -34,6 +38,14 @@ int primaryScreenHeight() {
 SessionWorker::SessionWorker(QObject* parent) : QObject(parent), timer_(new QTimer(this)) {
     timer_->setInterval(std::chrono::milliseconds(20));
     connect(timer_, &QTimer::timeout, this, &SessionWorker::tick);
+    // Follow the DE's sensor-driven screen rotation (tablet/Surface): when the
+    // primary screen orientation changes, re-advertise the panel in the new
+    // orientation. The worker runs on a separate thread, so the connection is
+    // queued; orientationChanged is a cross-thread signal, which is fine.
+    if (QScreen* screen = QGuiApplication::primaryScreen()) {
+        connect(screen, &QScreen::orientationChanged, this,
+                &SessionWorker::onOrientationChanged, Qt::QueuedConnection);
+    }
 }
 
 void SessionWorker::start(od::Options options) {
@@ -93,6 +105,16 @@ void SessionWorker::startReceiver(od::Options options) {
             .device = "Linux",
             .installId = "linux-receiver",
             .protocolVersion = 2};
+        // Record the fixed native long/short dims (iPad-style) so an
+        // orientation change can swap them for a stable portrait/landscape
+        // without re-reading the live screen resolution.
+        panelLong_ = std::max(panel.pixelsWide, panel.pixelsHigh);
+        panelShort_ = std::min(panel.pixelsWide, panel.pixelsHigh);
+        panelInitialised_ = true;
+        // Advertise landscape (long x short) initially; orientation changes
+        // swap to portrait via onOrientationChanged.
+        panel.pixelsWide = panelLong_;
+        panel.pixelsHigh = panelShort_;
         receiver_ = std::make_unique<od::ReceiverSession>();
         decoder_ = std::make_unique<od::FfmpegDecoder>();
         // usbmuxd protocol (senders reach us with USBMUXD_SOCKET_ADDRESS) or
@@ -220,6 +242,22 @@ void SessionWorker::tick() {
 void SessionWorker::setPanel(const int width, const int height, const double scale) {
     if (receiver_) {
         receiver_->setNativePanel(width, height, scale);
+    }
+}
+
+void SessionWorker::onOrientationChanged(const Qt::ScreenOrientation orientation) {
+    if (!receiver_ || !panelInitialised_) return;
+    // Match the iPad receiver: keep a fixed native panel and simply swap
+    // long/short on orientation change. This is more stable than re-reading
+    // the live screen resolution, which varies per orientation/mode on many
+    // compositors. If the DE hasn't implemented automatic rotation, this
+    // signal never fires, so nothing happens — which is the correct no-op.
+    const bool portrait = orientation == Qt::PortraitOrientation
+        || orientation == Qt::InvertedPortraitOrientation;
+    if (portrait) {
+        receiver_->setNativePanel(panelShort_, panelLong_, 1.0);
+    } else {
+        receiver_->setNativePanel(panelLong_, panelShort_, 1.0);
     }
 }
 

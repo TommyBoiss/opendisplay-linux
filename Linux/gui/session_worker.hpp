@@ -25,6 +25,9 @@ public slots:
     void stop();
     /// Update the advertised panel size (receiver mode) on window resize.
     void setPanel(int width, int height, double scale);
+    /// React to the desktop environment's sensor-driven screen rotation and
+    /// re-advertise the panel so the sender rebuilds portrait/landscape.
+    void onOrientationChanged(Qt::ScreenOrientation orientation);
     /// Send a touch event back to the sender (receiver mode).
     void sendTouch(const QString& phase, double x, double y);
     /// Send a scroll event back to the sender (receiver mode).
@@ -59,6 +62,12 @@ private:
     bool receiverConnected_ = false;
     int lastFrameWidth_ = 0;
     int lastFrameHeight_ = 0;
+    // Fixed native panel dimensions in the default (landscape) orientation.
+    // Orientation changes swap them to match the iPad receiver: the physical
+    // panel stays constant, only the shape flips.
+    bool panelInitialised_ = false;
+    int panelLong_ = 0;
+    int panelShort_ = 0;
 };
 
 }  // namespace od::gui
