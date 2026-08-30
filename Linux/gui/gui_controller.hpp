@@ -26,6 +26,8 @@ class GuiController final : public QObject {
     Q_PROPERTY(bool quitting READ quitting NOTIFY quittingChanged)
     Q_PROPERTY(QVariantMap savedSettings READ savedSettings CONSTANT)
     Q_PROPERTY(QString currentFrame READ currentFrame NOTIFY frameReady)
+    Q_PROPERTY(int streamWidth READ streamWidth NOTIFY streamSizeChanged)
+    Q_PROPERTY(int streamHeight READ streamHeight NOTIFY streamSizeChanged)
 
 public:
     explicit GuiController(QObject* parent = nullptr);
@@ -38,6 +40,8 @@ public:
     [[nodiscard]] bool trayAvailable() const { return trayAvailable_; }
     [[nodiscard]] bool quitting() const { return quitting_; }
     [[nodiscard]] QVariantMap savedSettings() const;
+    [[nodiscard]] int streamWidth() const { return streamWidth_; }
+    [[nodiscard]] int streamHeight() const { return streamHeight_; }
     [[nodiscard]] QString currentFrame() const { return currentFrame_; }
     /// The image provider QML uses to fetch the latest frame.
     [[nodiscard]] FrameProvider* frameProvider() { return &frameProvider_; }
@@ -60,6 +64,8 @@ signals:
     void showWindowRequested();
     /// Emitted with a decoded frame for the QML video surface (receiver mode).
     void frameReady();
+    /// Emitted when the decoded stream's actual dimensions change.
+    void streamSizeChanged();
 
 private slots:
     void applyWorkerState(const QString& status, const QString& detail,
@@ -83,6 +89,8 @@ private:
     QString detail_ = QStringLiteral("Ready to connect.");
     QString currentFrame_;
     FrameProvider frameProvider_;
+    int streamWidth_ = 0;
+    int streamHeight_ = 0;
     bool connected_ = false;
     bool busy_ = false;
     bool trayAvailable_ = false;

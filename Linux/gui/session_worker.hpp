@@ -35,6 +35,9 @@ signals:
                       bool connected, bool busy);
     /// Emitted when a decoded frame is ready for display (receiver mode).
     void frameReady(const od::DecodedFrame& frame);
+    /// Emitted when the decoded stream's actual dimensions change, so the GUI
+    /// can resize the advertised panel to match what the sender streams.
+    void streamSizeChanged(int width, int height);
     /// Emitted when the receiver window is resized so the panel can be updated.
     void panelChanged(int width, int height, double scale);
 
@@ -52,6 +55,8 @@ private:
     std::unique_ptr<od::ServiceAdvertiser> advertiser_;
     od::SessionRole role_ = od::SessionRole::Sender;
     bool receiverConnected_ = false;
+    int lastFrameWidth_ = 0;
+    int lastFrameHeight_ = 0;
 };
 
 }  // namespace od::gui

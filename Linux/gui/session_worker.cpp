@@ -100,6 +100,14 @@ void SessionWorker::startReceiver(od::Options options) {
             }
         }
         decoder_->start([this](const od::DecodedFrame& frame) {
+            // Report the actual stream dimensions once, so the GUI can resize
+            // the advertised panel to match what the sender is streaming.
+            if (frame.width > 0 && frame.height > 0
+                && (frame.width != lastFrameWidth_ || frame.height != lastFrameHeight_)) {
+                lastFrameWidth_ = frame.width;
+                lastFrameHeight_ = frame.height;
+                emit streamSizeChanged(frame.width, frame.height);
+            }
             emit frameReady(frame);
         }, panel.pixelsWide, panel.pixelsHigh);
         timer_->start();

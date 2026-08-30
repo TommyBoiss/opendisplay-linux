@@ -191,6 +191,12 @@ GuiController::GuiController(QObject* parent)
                 currentFrame_ = QStringLiteral("image://opendisplay/frame");
                 emit frameReady();
             });
+    connect(worker_, &SessionWorker::streamSizeChanged, this,
+            [this](const int width, const int height) {
+                streamWidth_ = width;
+                streamHeight_ = height;
+                emit streamSizeChanged();
+            });
     workerThread_.start();
     createTray();
 }
