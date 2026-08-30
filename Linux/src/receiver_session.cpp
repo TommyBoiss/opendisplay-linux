@@ -206,12 +206,19 @@ void ReceiverSession::readLoop() {
             closeWith("sender disconnected");
             return;
         }
-        const auto length = wire::decodeLength(header);
-        if (!length.has_value()) {
+        // Video frames can be large (a 2560x1440 keyframe with SPS/PPS easily
+        // exceeds 1 MiB), so decode the length WITHOUT the control-message cap
+        // that wire::decodeLength applies. Control vs video is decided by
+        // content afterwards. Cap at 256 MiB to bound a corrupt length.
+        const auto length = (static_cast<std::uint32_t>(static_cast<unsigned char>(header[0])) << 24U)
+            | (static_cast<std::uint32_t>(static_cast<unsigned char>(header[1])) << 16U)
+            | (static_cast<std::uint32_t>(static_cast<unsigned char>(header[2])) << 8U)
+            | static_cast<std::uint32_t>(static_cast<unsigned char>(header[3]));
+        if (length == 0 || length > 256U * 1024U * 1024U) {
             closeWith("invalid frame length from sender");
             return;
         }
-        std::string payload(static_cast<std::size_t>(*length), '\0');
+        std::string payload(static_cast<std::size_t>(length), '\0');
         if (!socket_.readExact(payload)) {
             closeWith("sender disconnected mid-frame");
             return;

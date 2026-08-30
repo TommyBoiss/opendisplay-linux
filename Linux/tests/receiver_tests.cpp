@@ -47,7 +47,15 @@ void runFakeSender(const std::uint16_t port, std::string& receivedHello,
     od::EncodedFrame encoded{.capturedAtMs = 100, .annexB = std::string("\0\0\0\1x", 5)};
     assert(client.writeAll(od::wire::frame(od::wire::videoPayload(encoded, 120))));
 
-    // Keep the connection open briefly so the receiver can process the frame.
+    // Stream a LARGE video frame (> 1 MiB) — a 2560x1440 keyframe with SPS/PPS
+    // exceeds the control-message cap, and the receiver must not treat it as
+    // an invalid length and drop the connection.
+    std::string bigAnnexB("\0\0\0\1", 4);
+    bigAnnexB.append(2 * 1024 * 1024, 'x');  // ~2 MiB of NAL data
+    od::EncodedFrame big{.capturedAtMs = 200, .annexB = bigAnnexB};
+    assert(client.writeAll(od::wire::frame(od::wire::videoPayload(big, 220))));
+
+    // Keep the connection open briefly so the receiver can process the frames.
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
@@ -57,13 +65,16 @@ int main() {
     od::PhoneInfo panel{.pixelsWide = 1920, .pixelsHigh = 1080, .scale = 1.0,
                         .device = "Linux", .installId = "test-id", .protocolVersion = 2};
     od::ReceiverSession receiver;
-    bool gotFrame = false;
+    int frames = 0;
+    bool gotBigFrame = false;
     std::string receivedHello;
     std::string receivedPong;
     receiver.start(0, panel,
                    [&](const od::ReceivedFrame& frame) {
-                       gotFrame = true;
-                       assert(frame.bgra == std::string("\0\0\0\1x", 5));
+                       ++frames;
+                       if (frame.bgra.size() > 1024 * 1024) {
+                           gotBigFrame = true;
+                       }
                    },
                    [&](const std::string&) {});
 
@@ -72,15 +83,19 @@ int main() {
 
     std::thread sender(runFakeSender, port, std::ref(receivedHello), std::ref(receivedPong));
 
-    // Drive the receiver's tick loop until the frame arrives or timeout.
+    // Drive the receiver's tick loop until the big frame arrives or timeout.
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
-    while (!gotFrame && std::chrono::steady_clock::now() < deadline) {
+    while (!gotBigFrame && std::chrono::steady_clock::now() < deadline) {
         receiver.tick();
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     sender.join();
 
-    assert(gotFrame);
+    // Both the small and the >1 MiB frame must have been delivered. The big
+    // frame proves the receiver no longer treats large video frames as an
+    // invalid length (the old code dropped the connection on them).
+    assert(frames >= 2);
+    assert(gotBigFrame);
     // The hello the sender received must advertise our panel.
     const auto helloJson = od::wire::parseJson(receivedHello);
     assert(helloJson);
