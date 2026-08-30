@@ -4,6 +4,7 @@
 
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -165,16 +166,24 @@ Socket connectUsb(const int deviceHandle, const std::uint16_t port) {
 }
 
 Socket listenTcp(const std::uint16_t port) {
-    Socket listener(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    // Dual-stack: bind an IPv6 socket with IPV6_V6ONLY disabled so a single
+    // listener accepts both IPv4 and IPv6 peers. Senders resolve receivers
+    // over mDNS and may get an IPv6 address (e.g. fdc8::… link-local ULA),
+    // which an IPv4-only bind could never accept.
+    Socket listener(::socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP));
     if (!listener.valid()) {
-        throw std::runtime_error("cannot create listening socket: " + std::string(std::strerror(errno)));
+        throw std::runtime_error("cannot create listening socket: "
+                                 + std::string(std::strerror(errno)));
     }
     const int enabled = 1;
     setsockopt(listener.fd(), SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = htons(port);
+    // IPV6_V6ONLY=0 makes the single IPv6 socket accept IPv4 peers too.
+    const int ipv6Only = 0;
+    setsockopt(listener.fd(), IPPROTO_IPV6, IPV6_V6ONLY, &ipv6Only, sizeof(ipv6Only));
+    sockaddr_in6 address{};
+    address.sin6_family = AF_INET6;
+    address.sin6_addr = in6addr_any;
+    address.sin6_port = htons(port);
     if (::bind(listener.fd(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
         throw std::runtime_error("cannot bind port " + std::to_string(port) + ": "
                                  + std::string(std::strerror(errno)));
@@ -187,7 +196,7 @@ Socket listenTcp(const std::uint16_t port) {
 }
 
 Socket acceptConnection(const Socket& listener) {
-    sockaddr_in peer{};
+    sockaddr_storage peer{};
     socklen_t peerLength = sizeof(peer);
     const int fd = ::accept(listener.fd(), reinterpret_cast<sockaddr*>(&peer), &peerLength);
     if (fd < 0) {
