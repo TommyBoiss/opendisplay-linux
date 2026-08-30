@@ -49,7 +49,10 @@ int main() {
     assert(!encoded.empty());
     encoder.stop();
 
-    // Feed the encoded Annex B into the decoder.
+    // Feed the encoded Annex B into the decoder. Pass a WRONG hint (32x32) to
+    // prove the decoder discovers the real 64x64 stream dimensions from
+    // ffmpeg's stderr rather than trusting the hint (the Mac streams at
+    // quality-scaled resolution, which may differ from the advertised panel).
     std::vector<od::DecodedFrame> decoded;
     std::mutex decodeMutex;
     std::condition_variable decodeCondition;
@@ -60,7 +63,7 @@ int main() {
             decoded.push_back(std::move(frame));
         }
         decodeCondition.notify_all();
-    }, 64, 64);
+    }, 32, 32);
     for (const auto& frame : encoded) {
         decoder.submit(frame.annexB);
     }
@@ -74,6 +77,7 @@ int main() {
     decoder.stop();
 
     assert(!decoded.empty());
+    // The decoder must have discovered the real 64x64 size, not the 32x32 hint.
     assert(decoded.front().width == 64);
     assert(decoded.front().height == 64);
     assert(decoded.front().bgra.size() == 64 * 64 * 4);

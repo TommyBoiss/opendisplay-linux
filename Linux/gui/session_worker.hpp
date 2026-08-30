@@ -51,6 +51,7 @@ private:
     std::unique_ptr<od::FfmpegDecoder> decoder_;
     std::unique_ptr<od::ServiceAdvertiser> advertiser_;
     od::SessionRole role_ = od::SessionRole::Sender;
+    bool receiverConnected_ = false;
 };
 
 }  // namespace od::gui

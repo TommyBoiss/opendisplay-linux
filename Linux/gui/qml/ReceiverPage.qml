@@ -24,6 +24,14 @@ Kirigami.Page {
             source: root.controller.currentFrame
             fillMode: Image.PreserveAspectFit
             cache: false
+            // Re-fetch from the provider whenever a new frame arrives.
+            Connections {
+                target: root.controller
+                function onFrameReady() {
+                    videoImage.source = ""
+                    videoImage.source = root.controller.currentFrame
+                }
+            }
         }
 
         // Input: forward mouse/touch to the sender as normalized coordinates.

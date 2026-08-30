@@ -55,6 +55,7 @@ void SessionWorker::startSender(od::Options options) {
 }
 
 void SessionWorker::startReceiver(od::Options options) {
+    receiverConnected_ = false;
     emit stateChanged(QStringLiteral("Listening"),
                       QStringLiteral("Waiting for a sender on port %1…").arg(options.port),
                       false, true);
@@ -124,12 +125,20 @@ void SessionWorker::startReceiver(od::Options options) {
 void SessionWorker::tick() {
     if (receiver_) {
         try {
+            // Transition to "Connected" the moment a sender dials in, so the
+            // GUI reflects the live session instead of staying on "Listening".
+            if (receiver_->connected() && !receiverConnected_) {
+                receiverConnected_ = true;
+                emit stateChanged(QStringLiteral("Connected"),
+                                  QStringLiteral("Streaming from the sender."), true, false);
+            }
             if (receiver_->tick()) return;
             timer_->stop();
             receiver_->stop();
             receiver_.reset();
             if (decoder_) decoder_->stop();
             decoder_.reset();
+            receiverConnected_ = false;
             emit stateChanged(QStringLiteral("Disconnected"),
                               QStringLiteral("The sender ended the connection."), false, false);
         } catch (const std::exception& error) {
@@ -138,6 +147,7 @@ void SessionWorker::tick() {
             receiver_.reset();
             if (decoder_) decoder_->stop();
             decoder_.reset();
+            receiverConnected_ = false;
             emit stateChanged(QStringLiteral("Connection failed"),
                               QString::fromUtf8(error.what()), false, false);
         }
@@ -198,6 +208,7 @@ void SessionWorker::stop() {
     if (advertiser_) {
         advertiser_.reset();
     }
+    receiverConnected_ = false;
     emit stateChanged(QStringLiteral("Disconnected"),
                       QStringLiteral("Ready to connect."), false, false);
 }

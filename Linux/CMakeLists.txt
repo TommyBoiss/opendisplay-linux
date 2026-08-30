@@ -111,6 +111,8 @@ if(NOT OPENDISPLAY_BUILD_GUI STREQUAL "OFF")
         set_source_files_properties(gui/qml/Main.qml PROPERTIES
             QT_RESOURCE_ALIAS Main.qml)
         qt_add_executable(opendisplay-gui
+            gui/frame_provider.cpp
+            gui/frame_provider.hpp
             gui/gui_controller.cpp
             gui/gui_controller.hpp
             gui/gui_main.cpp

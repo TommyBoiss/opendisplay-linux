@@ -1,6 +1,7 @@
 #pragma once
 
-#include <QImage>
+#include "frame_provider.hpp"
+
 #include <QObject>
 #include <QSettings>
 #include <QThread>
@@ -24,7 +25,7 @@ class GuiController final : public QObject {
     Q_PROPERTY(bool trayAvailable READ trayAvailable NOTIFY trayAvailableChanged)
     Q_PROPERTY(bool quitting READ quitting NOTIFY quittingChanged)
     Q_PROPERTY(QVariantMap savedSettings READ savedSettings CONSTANT)
-    Q_PROPERTY(QImage currentFrame READ currentFrame NOTIFY frameReady)
+    Q_PROPERTY(QString currentFrame READ currentFrame NOTIFY frameReady)
 
 public:
     explicit GuiController(QObject* parent = nullptr);
@@ -37,7 +38,9 @@ public:
     [[nodiscard]] bool trayAvailable() const { return trayAvailable_; }
     [[nodiscard]] bool quitting() const { return quitting_; }
     [[nodiscard]] QVariantMap savedSettings() const;
-    [[nodiscard]] QImage currentFrame() const { return currentFrame_; }
+    [[nodiscard]] QString currentFrame() const { return currentFrame_; }
+    /// The image provider QML uses to fetch the latest frame.
+    [[nodiscard]] FrameProvider* frameProvider() { return &frameProvider_; }
 
     Q_INVOKABLE void connectDevice(const QVariantMap& values);
     Q_INVOKABLE void connectLast();
@@ -78,7 +81,8 @@ private:
     QTimer* trayPoll_ = nullptr;
     QString status_ = QStringLiteral("Disconnected");
     QString detail_ = QStringLiteral("Ready to connect.");
-    QImage currentFrame_;
+    QString currentFrame_;
+    FrameProvider frameProvider_;
     bool connected_ = false;
     bool busy_ = false;
     bool trayAvailable_ = false;

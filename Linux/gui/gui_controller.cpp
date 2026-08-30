@@ -2,11 +2,13 @@
 
 #include "session_worker.hpp"
 
+#include "opendisplay/ffmpeg_decoder.hpp"
 #include "opendisplay/log.hpp"
 #include "opendisplay/types.hpp"
 
 #include <QAction>
 #include <QApplication>
+#include <QBuffer>
 #include <QCoreApplication>
 #include <QIcon>
 #include <QMenu>
@@ -23,6 +25,13 @@
 
 namespace od::gui {
 namespace {
+
+// Register the frame type so the queued frameReady signal (emitted from the
+// decoder's reader thread to the main thread) is not silently dropped.
+const bool kFrameMetaTypeRegistered = [] {
+    qRegisterMetaType<od::DecodedFrame>("od::DecodedFrame");
+    return true;
+}();
 
 QString text(const QVariantMap& values, const char* key, const char* fallback = "") {
     return values.value(QString::fromLatin1(key), QString::fromLatin1(fallback))
@@ -172,9 +181,14 @@ GuiController::GuiController(QObject* parent)
             this, &GuiController::applyWorkerState);
     connect(worker_, &SessionWorker::frameReady, this,
             [this](const od::DecodedFrame& frame) {
-                currentFrame_ = QImage(reinterpret_cast<const uchar*>(frame.bgra.data()),
-                                       frame.width, frame.height, frame.width * 4,
-                                       QImage::Format_ARGB32).copy();
+                // Hand the decoded frame to the image provider, which QML's
+                // Image fetches directly from the scene graph — no per-frame
+                // PNG encoding, so this stays fast enough for live video.
+                const QImage image(reinterpret_cast<const uchar*>(frame.bgra.data()),
+                                   frame.width, frame.height, frame.width * 4,
+                                   QImage::Format_ARGB32);
+                frameProvider_.setFrame(image);
+                currentFrame_ = QStringLiteral("image://opendisplay/frame");
                 emit frameReady();
             });
     workerThread_.start();
