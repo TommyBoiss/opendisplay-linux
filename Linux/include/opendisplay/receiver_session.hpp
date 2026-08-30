@@ -119,6 +119,11 @@ private:
     std::chrono::steady_clock::time_point lastPingSent_{};
     std::chrono::steady_clock::time_point lastHelloSent_{};
     bool helloPending_ = false;
+    /// The merged cursor state. The Mac sends position (`cursor`) and sprite
+    /// (`cursorImg`) as separate messages, so each handler must update only
+    /// its own fields and emit the combined result — otherwise the two
+    /// overwrite each other (sprite flashes at the default top-left origin).
+    CursorState cursor_;
 };
 
 }  // namespace od

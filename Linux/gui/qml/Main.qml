@@ -67,6 +67,18 @@ Kirigami.ApplicationWindow {
             root.raise()
             root.requestActivate()
         }
+
+        // Auto-enter fullscreen the moment we're receiving, so the surface is
+        // used as a display right away (no window chrome).
+        function onStateChanged() {
+            if (roleBox.currentValue === "receive" && root.controller.connected && !root.isFullscreen) {
+                root.visibility = Window.FullScreen
+                root.isFullscreen = true
+            } else if (root.isFullscreen && (!root.controller.connected || roleBox.currentValue !== "receive")) {
+                root.visibility = Window.Windowed
+                root.isFullscreen = false
+            }
+        }
     }
 
     // Full-window video overlay for receiver mode. Overlays the ENTIRE window

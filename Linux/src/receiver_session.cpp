@@ -265,25 +265,27 @@ void ReceiverSession::handleCursor(const QJsonObject& object) {
     if (!onCursor_) {
         return;
     }
-    CursorState state;
-    state.visible = object.value("v").toInt(0) != 0;
-    state.x = object.value("x").toDouble(0.0);
-    state.y = object.value("y").toDouble(0.0);
-    onCursor_(std::move(state));
+    // Merge: this message only carries the position/visibility. Keep the
+    // sprite fields from the last cursorImg so they don't reset to defaults
+    // (which would shrink the sprite to nothing / snap it to the top-left).
+    cursor_.visible = object.value("v").toInt(0) != 0;
+    cursor_.x = object.value("x").toDouble(0.0);
+    cursor_.y = object.value("y").toDouble(0.0);
+    onCursor_(cursor_);
 }
 
 void ReceiverSession::handleCursorImage(const QJsonObject& object) {
     if (!onCursor_) {
         return;
     }
-    CursorState state;
-    state.visible = true;
-    state.width = object.value("nw").toDouble(0.0);
-    state.height = object.value("nh").toDouble(0.0);
-    state.anchorX = object.value("ax").toDouble(0.0);
-    state.anchorY = object.value("ay").toDouble(0.0);
-    state.png = object.value("png").toString().toStdString();
-    onCursor_(std::move(state));
+    // Merge: this message only carries the sprite (size, hotspot, PNG). Keep
+    // the position from the last `cursor` message.
+    cursor_.width = object.value("nw").toDouble(0.0);
+    cursor_.height = object.value("nh").toDouble(0.0);
+    cursor_.anchorX = object.value("ax").toDouble(0.0);
+    cursor_.anchorY = object.value("ay").toDouble(0.0);
+    cursor_.png = object.value("png").toString().toStdString();
+    onCursor_(cursor_);
 }
 
 void ReceiverSession::handleVideo(const std::string_view payload) {

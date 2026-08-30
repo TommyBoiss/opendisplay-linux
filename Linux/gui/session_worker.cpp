@@ -4,6 +4,8 @@
 #include "opendisplay/desktop_backend_factory.hpp"
 #include "opendisplay/discovery.hpp"
 
+#include <QGuiApplication>
+#include <QScreen>
 #include <QTimer>
 
 #include <chrono>
@@ -11,6 +13,23 @@
 #include <string>
 
 namespace od::gui {
+namespace {
+
+int primaryScreenWidth() {
+    if (const QScreen* screen = QGuiApplication::primaryScreen()) {
+        return screen->size().width();
+    }
+    return 1920;
+}
+
+int primaryScreenHeight() {
+    if (const QScreen* screen = QGuiApplication::primaryScreen()) {
+        return screen->size().height();
+    }
+    return 1080;
+}
+
+}  // namespace
 
 SessionWorker::SessionWorker(QObject* parent) : QObject(parent), timer_(new QTimer(this)) {
     timer_->setInterval(std::chrono::milliseconds(20));
@@ -60,9 +79,20 @@ void SessionWorker::startReceiver(od::Options options) {
                       QStringLiteral("Waiting for a sender on port %1…").arg(options.port),
                       false, true);
     try {
-        od::PhoneInfo panel{.pixelsWide = 1920, .pixelsHigh = 1080, .scale = 1.0,
-                            .device = "Linux", .installId = "linux-receiver",
-                            .protocolVersion = 2};
+        // Advertise the ACTUAL primary screen resolution instead of a
+        // hardcoded 1920x1080 panel, so the Mac sizes its virtual display to
+        // match this surface rather than a small fixed panel.
+        od::PhoneInfo panel{
+            .pixelsWide = options.display.virtualResolution.has_value()
+                ? options.display.virtualResolution->width
+                : primaryScreenWidth(),
+            .pixelsHigh = options.display.virtualResolution.has_value()
+                ? options.display.virtualResolution->height
+                : primaryScreenHeight(),
+            .scale = 1.0,
+            .device = "Linux",
+            .installId = "linux-receiver",
+            .protocolVersion = 2};
         receiver_ = std::make_unique<od::ReceiverSession>();
         decoder_ = std::make_unique<od::FfmpegDecoder>();
         // usbmuxd protocol (senders reach us with USBMUXD_SOCKET_ADDRESS) or
