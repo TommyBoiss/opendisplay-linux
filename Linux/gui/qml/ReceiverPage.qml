@@ -65,8 +65,9 @@ Kirigami.Page {
         visible: !root.controller.connected
     }
 
-    // Floating controls — fade out so the video stays unobstructed.
+    // Floating controls — hidden in fullscreen so the video fills the screen.
     footer: Controls.ToolBar {
+        visible: !root.isFullscreen
         RowLayout {
             anchors.fill: parent
             Controls.Label {
@@ -86,11 +87,17 @@ Kirigami.Page {
         }
     }
 
+    property bool isFullscreen: false
+
     function toggleFullscreen() {
         const window = root.Window.window
         if (!window) return
-        window.visibility = window.visibility === Window.FullScreen
-            ? Window.Windowed
-            : Window.FullScreen
+        if (window.visibility === Window.FullScreen) {
+            window.visibility = Window.Windowed
+            root.isFullscreen = false
+        } else {
+            window.visibility = Window.FullScreen
+            root.isFullscreen = true
+        }
     }
 }

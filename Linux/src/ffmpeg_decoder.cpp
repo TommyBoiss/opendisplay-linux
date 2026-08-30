@@ -46,13 +46,12 @@ void FfmpegDecoder::start(FrameCallback callback, const int width, const int hei
     stop();
     std::signal(SIGPIPE, SIG_IGN);
     callback_ = std::move(callback);
+    // The width/height args are informational only (the advertised panel size).
     // Do NOT pre-set width_/height_ here: the Mac streams at quality-scaled
     // resolution (1440x810 at .balanced, 960x540 at .fast), which may differ
     // from the advertised panel size. readError() discovers the ACTUAL stream
     // dimensions from ffmpeg's stderr and sets them; leaving them 0 lets that
-    // discovery run. The passed width/height are kept as a fallback hint only.
-    hintWidth_ = width;
-    hintHeight_ = height;
+    // discovery run. Slicing at the wrong size produces garbage.
     width_ = 0;
     height_ = 0;
     running_.store(true);
@@ -275,15 +274,12 @@ void FfmpegDecoder::readOutput(const int fd) {
             std::lock_guard lock(dimsMutex_);
             width = width_;
             height = height_;
-            // Fall back to the advertised panel size if ffmpeg's stderr
-            // discovery hasn't produced dimensions yet (e.g. parsing failed).
-            if (width <= 0 || height <= 0) {
-                width = hintWidth_;
-                height = hintHeight_;
-            }
         }
+        // Only slice once the ACTUAL stream dimensions are discovered from
+        // ffmpeg's stderr. Slicing at the hint (1920x1080) before discovery
+        // produces misaligned garbage (black/white scrolling, half-black).
         if (width <= 0 || height <= 0) {
-            continue;  // no dimensions known yet; keep buffering
+            continue;  // dimensions not known yet; keep buffering
         }
         const auto frameSize = static_cast<std::size_t>(width) * height * 4;
         while (buffer.size() >= frameSize) {

@@ -65,8 +65,6 @@ private:
     std::mutex dimsMutex_;
     int width_ = 0;
     int height_ = 0;
-    int hintWidth_ = 0;
-    int hintHeight_ = 0;
 };
 
 }  // namespace od
