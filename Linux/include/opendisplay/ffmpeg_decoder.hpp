@@ -47,7 +47,6 @@ private:
     void startProcess();
     void stopProcess();
     void readOutput(int fd);
-    void readError(int fd);
     std::vector<std::string> arguments() const;
 
     FrameCallback callback_;
@@ -56,13 +55,12 @@ private:
     std::deque<std::string> pending_;
     std::thread worker_;
     std::thread reader_;
-    std::thread errorReader_;
     int inputFd_ = -1;
     int outputFd_ = -1;
-    int errorFd_ = -1;
     int childPid_ = -1;
     std::atomic_bool running_ = false;
-    std::mutex dimsMutex_;
+    // Fixed output size: ffmpeg scales every decoded frame to this, so the
+    // rawvideo output is always exactly width*height*4 bytes per frame.
     int width_ = 0;
     int height_ = 0;
 };
