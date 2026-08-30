@@ -20,12 +20,10 @@ Kirigami.Page {
 
         Image {
             id: videoImage
-            // Aspect-correct fill: track the ACTUAL image size (not sourceSize,
-            // which is 0 before the first frame loads and would make the ratio
-            // NaN/invisible).
-            anchors.centerIn: parent
-            width: Math.min(parent.width, parent.height * (videoImage.implicitWidth / Math.max(1, videoImage.implicitHeight)))
-            height: Math.min(parent.height, parent.width * (videoImage.implicitHeight / Math.max(1, videoImage.implicitWidth)))
+            // Fill the parent and let PreserveAspectFit scale + center the
+            // frame correctly. Manual width/height math overflowed the window
+            // and clipped (left half black, drag to reveal the rest).
+            anchors.fill: parent
             source: root.controller.currentFrame
             fillMode: Image.PreserveAspectFit
             cache: false
@@ -54,6 +52,12 @@ Kirigami.Page {
             onWheel: wheel => root.controller.sendScroll(wheel.angleDelta.x / 120.0, wheel.angleDelta.y / 120.0)
             onDoubleClicked: root.toggleFullscreen()
         }
+    }
+
+    // F11 toggles borderless fullscreen.
+    Shortcut {
+        sequence: "F11"
+        onActivated: root.toggleFullscreen()
     }
 
     // Status overlay (only while waiting for a sender).
