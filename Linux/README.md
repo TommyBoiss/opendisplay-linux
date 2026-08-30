@@ -203,9 +203,53 @@ computer-to-computer links there are two options:
   link — Wi-Fi, Ethernet, or a USB network interface.
 
 - **USB network interface.** Create a USB network link (`g_ether`/NCM/RNDIS
-  or a USB-Ethernet adapter). The receiver binds `0.0.0.0` and advertises on
-  all interfaces, so a sender reaches it exactly like Wi-Fi.
+  or a USB-Ethernet adapter). The receiver listens dual-stack (`::`, accepting
+  both IPv4 and IPv6 peers) and advertises on all interfaces, so a sender
+  reaches it exactly like Wi-Fi.
 
+### Receiver troubleshooting
+
+If the sender reports `cannot connect to <address>:<port>` while the receiver
+says it is listening, check these in order:
+
+1. **Run the receiver built after the dual-stack fix.** Older builds bound an
+   IPv4-only socket, so a sender that resolves the receiver to an IPv6 address
+   (for example a `fdc8:…` ULA over mDNS) could never connect. Verify with:
+
+   ```sh
+   ss -tln | grep 9000
+   ```
+
+   `*:9000` or `[::]:9000` is correct; `0.0.0.0:9000` is the old build.
+
+2. **Open the listen port in the firewall.** `firewalld` blocks inbound
+   connections by default on Fedora, regardless of the address family:
+
+   ```sh
+   sudo firewall-cmd --add-port=9000/tcp --permanent
+   sudo firewall-cmd --reload
+   ```
+
+   (Substitute your port if it is not 9000. `iptables`/`ufw` users need the
+   equivalent rule for both IPv4 and IPv6.)
+
+3. **Test reachability from the sender machine** while the receiver listens:
+
+   ```sh
+   nc -vz <receiver-address> 9000
+   ```
+
+   `Connection refused` points at the firewall or a wrong address; `succeeded`
+   means the transport is fine and the problem is elsewhere.
+
+4. **Flush stale mDNS caches** if the receiver restarted or changed addresses:
+
+   ```sh
+   # on the Mac
+   sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
+   ```
+
+   Then re-discover the receiver in the sender app.
 
 ### Virtual monitor layout
 
