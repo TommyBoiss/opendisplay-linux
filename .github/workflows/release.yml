@@ -165,6 +165,10 @@ jobs:
           manifest-path: Linux/packaging/flatpak/org.opendisplay.desktop.yml
           arch: x86_64
           build-bundle: true
+          # Reuse the warm .flatpak-builder cache across branches and PRs so
+          # the C deps aren't rebuilt and the org.kde runtime isn't re-fetched
+          # on every run. The action appends the CPU arch, so no need to add it.
+          cache-key: opendisplay-flatpak-${{ hashFiles('Linux/packaging/flatpak/org.opendisplay.desktop.yml') }}
 
       - name: Upload Flatpak artifact to release
         env:
