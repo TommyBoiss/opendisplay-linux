@@ -122,3 +122,5 @@ private:
 };
 
 }  // namespace od
+
+Q_DECLARE_METATYPE(od::CursorState)
