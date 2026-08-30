@@ -86,10 +86,13 @@ void SessionWorker::startReceiver(od::Options options) {
                                                   QString::fromStdString(reason),
                                                   false, false);
                             });
-            // Advertise over mDNS so senders can discover us.
-            const std::string publishError = od::publishReceiver(
+            // Advertise over mDNS for the lifetime of the session so senders
+            // (the Mac app and the Linux CLI) keep discovering us.
+            advertiser_ = std::make_unique<od::ServiceAdvertiser>();
+            const std::string publishError = advertiser_->start(
                 options.serviceName, options.port, "linux-receiver");
             if (!publishError.empty()) {
+                advertiser_.reset();
                 emit stateChanged(QStringLiteral("Connection failed"),
                                   QString::fromStdString(publishError), false, false);
                 return;
@@ -191,6 +194,9 @@ void SessionWorker::stop() {
     if (session_) {
         session_->stop();
         session_.reset();
+    }
+    if (advertiser_) {
+        advertiser_.reset();
     }
     emit stateChanged(QStringLiteral("Disconnected"),
                       QStringLiteral("Ready to connect."), false, false);

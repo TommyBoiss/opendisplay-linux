@@ -216,6 +216,18 @@ if(BUILD_TESTING)
     add_test(NAME usbmux-receiver COMMAND opendisplay-usbmux-receiver-tests)
     set_tests_properties(usbmux-receiver PROPERTIES TIMEOUT 10)
 
+    # Verifies the _opensidecar._tcp record persists (needs a running avahi-daemon).
+    add_executable(opendisplay-avahi-publish-tests
+        tests/avahi_publish_tests.cpp
+        src/avahi_publish.cpp
+    )
+    target_include_directories(opendisplay-avahi-publish-tests PRIVATE include)
+    target_link_libraries(opendisplay-avahi-publish-tests PRIVATE
+        Qt6::Core Threads::Threads PkgConfig::AVAHI)
+    target_compile_options(opendisplay-avahi-publish-tests PRIVATE -UNDEBUG)
+    add_test(NAME avahi-publish COMMAND opendisplay-avahi-publish-tests)
+    set_tests_properties(avahi-publish PROPERTIES TIMEOUT 15)
+
     add_executable(opendisplay-encoder-tests
         tests/encoder_tests.cpp
         src/ffmpeg_encoder.cpp

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "opendisplay/avahi_publish.hpp"
 #include "opendisplay/ffmpeg_decoder.hpp"
 #include "opendisplay/receiver_session.hpp"
 #include "opendisplay/session.hpp"
@@ -48,6 +49,7 @@ private:
     std::unique_ptr<od::Session> session_;
     std::unique_ptr<od::ReceiverSession> receiver_;
     std::unique_ptr<od::FfmpegDecoder> decoder_;
+    std::unique_ptr<od::ServiceAdvertiser> advertiser_;
     od::SessionRole role_ = od::SessionRole::Sender;
 };
 
